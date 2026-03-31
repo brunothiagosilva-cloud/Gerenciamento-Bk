@@ -19,23 +19,18 @@ st.set_page_config(page_title="Gerenciamento BK", page_icon="🏢", layout="wide
 st.markdown("""
     <style>
     .stApp { background-color: #F4F7F6; }
-    
-    /* Estilos dos Cartões Principais (Top KPIs) */
     .kpi-main-card { background-color: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); display: flex; flex-direction: column; position: relative; overflow: hidden;}
     .kpi-main-title { color: #6B7280; font-size: 0.85rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.5rem; }
     .kpi-main-value { color: #005F60; font-size: 3.5rem; font-weight: 800; line-height: 1; margin: 0; }
     
-    /* Estilos dos Cartões Secundários (Headcounts) */
     .kpi-sub-card { background-color: white; padding: 1.2rem; border-radius: 6px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03); margin-bottom: 1rem; }
     .border-pj { border-left: 4px solid #005F60; }
     .border-sede { border-left: 4px solid #6B7280; }
     .border-pf { border-left: 4px solid #7DD3FC; }
     .border-ppd { border-left: 4px solid #8B4513; }
-    .kpi-sub-title { color: #6B7280; font-size: 0.75rem; font-weight: 700; margin-bottom: 0.2rem; }
+    .kpi-sub-title { color: #6B7280; font-size: 0.9rem; font-weight: 800; margin-bottom: 0.2rem; }
     .kpi-sub-value { color: #111827; font-size: 1.8rem; font-weight: 700; margin: 0; }
-    .kpi-sub-label { color: #9CA3AF; font-size: 0.8rem; font-weight: normal; }
-
-    /* Estilos para a Distribuição Departamental */
+    
     .dept-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #E5E7EB; padding-bottom: 0.5rem; margin-bottom: 1rem; }
     .dept-title { font-weight: 700; color: #374151; font-size: 1rem; display: flex; align-items: center; gap: 0.5rem;}
     .dot-pj { height: 8px; width: 8px; background-color: #005F60; border-radius: 50%; display: inline-block; }
@@ -46,7 +41,6 @@ st.markdown("""
     .dept-name { font-size: 0.85rem; color: #4B5563; font-weight: 600; text-transform: uppercase;}
     .dept-num { font-size: 0.9rem; color: #005F60; font-weight: 700; }
     
-    /* Utils */
     .section-title { font-size: 1.25rem; font-weight: 700; color: #111827; margin-top: 2rem; margin-bottom: 1rem; }
     .badge-status { padding: 4px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
     .bg-active { background-color: #D1FAE5; color: #065F46; }
@@ -59,35 +53,38 @@ st.markdown("""
 
 
 # ==========================================
-# ESTRUTURA ORGANIZACIONAL & VAGAS (VAZIO)
+# ESTRUTURA ORGANIZACIONAL PADRÃO
 # ==========================================
-ESTRUTURA = {
-    "PJ": ["Cadastro Requisitórios", "NIRA", "Detran", "Litispendência", "Obrigação de Fazer", "OPV", "Trabalhista", "TI", "Nomeação Contador", "Precatórios", "Cálculos", "Cartografia", "NPM", "NRST"],
-    "SEDE": ["APJ", "Saneamento", "Transação", "CGP", "CSAC", "DOF", "Centro de Estudos", "Consultoria", "Subcontencioso", "Cadastro", "ATIC", "PDA", "Auxílio Saúde"],
-    "PF": ["ITCMD", "Cálculos", "Multirão Garantia", "Jurimetria", "Cumprimento Geral", "Gestão de Crédito", "Arrematação", "TI", "Fazenda Autora", "NASS", "Falência", "Pesquisa", "Subsídios / Falência", "Levantamento", "TUSD"],
-    "PPD": ["Equipe Geral"]
+DEFAULT_ALVOS = {
+    "PJ": {"Cadastro Requisitórios": 5, "NIRA": 1, "Detran": 8, "Litispendência": 25, "Obrigação de Fazer": 28, "OPV": 28, "Trabalhista": 3, "TI": 6, "Nomeação Contador": 1, "Precatórios": 6, "Cálculos": 41, "Cartografia": 5, "NPM": 6, "NRST": 2},
+    "SEDE": {"APJ": 43, "Saneamento": 1, "Transação": 3, "CGP": 1, "CSAC": 1, "DOF": 4, "Centro de Estudos": 2, "Consultoria": 1, "Subcontencioso": 1, "Cadastro": 45, "ATIC": 2, "PDA": 2, "Auxílio Saúde": 7},
+    "PF": {"ITCMD": 4, "Cálculos": 10, "Multirão Garantia": 1, "Jurimetria": 1, "Cumprimento Geral": 3, "Gestão de Crédito": 6, "Arrematação": 2, "TI": 3, "Fazenda Autora": 8, "NASS": 6, "Falência": 4, "Pesquisa": 5, "Subsídios / Falência": 3, "Levantamento": 2, "TUSD": 3},
+    "PPD": {"Equipe Geral": 4}
 }
 
-# Base de vagas inicia vazia para não mostrar dados fictícios
-DADOS_VAGAS = pd.DataFrame(columns=["Departamento", "Título da Função", "Vagas", "Status", "Filtro"])
+ESTRUTURA = {
+    "PJ": list(DEFAULT_ALVOS["PJ"].keys()),
+    "SEDE": list(DEFAULT_ALVOS["SEDE"].keys()),
+    "PF": list(DEFAULT_ALVOS["PF"].keys()),
+    "PPD": ["Equipe Geral"]
+}
 
 # ==========================================
 # BANCO DE DADOS E AUDITORIA
 # ==========================================
 class DatabaseManager:
     def __init__(self):
-        db_url = st.secrets["DATABASE_URL"] if "DATABASE_URL" in st.secrets else "sqlite:///colaboradores_v2.db"
+        db_url = st.secrets["DATABASE_URL"] if "DATABASE_URL" in st.secrets else "sqlite:///gerenciamento_bk_v2.db"
         self.engine = create_engine(db_url)
         self._inicializar_tabelas()
 
     def _inicializar_tabelas(self):
         with self.engine.connect() as conn:
+            # Tabela Colaboradores
             conn.execute(text('''
-                CREATE TABLE IF NOT EXISTS colaboradores (
+                CREATE TABLE IF NOT EXISTS colab_v3 (
                     id SERIAL PRIMARY KEY,
-                    nome VARCHAR(150) NOT NULL,
-                    cpf VARCHAR(20) UNIQUE,
-                    rg VARCHAR(20),
+                    nome VARCHAR(150) UNIQUE NOT NULL,
                     email VARCHAR(100),
                     raca VARCHAR(50),
                     genero VARCHAR(50),
@@ -96,6 +93,7 @@ class DatabaseManager:
                     status VARCHAR(20) DEFAULT 'Ativo'
                 )
             '''))
+            # Tabela Auditoria
             conn.execute(text('''
                 CREATE TABLE IF NOT EXISTS auditoria_logs (
                     id SERIAL PRIMARY KEY,
@@ -105,50 +103,90 @@ class DatabaseManager:
                     detalhes TEXT
                 )
             '''))
+            # Tabela Usuários
             conn.execute(text('''
-                CREATE TABLE IF NOT EXISTS usuarios (
+                CREATE TABLE IF NOT EXISTS users_v3 (
                     id SERIAL PRIMARY KEY,
                     username VARCHAR(50) UNIQUE NOT NULL,
                     senha VARCHAR(100) NOT NULL,
                     perfil VARCHAR(20) NOT NULL,
-                    nome VARCHAR(100) NOT NULL
+                    nome VARCHAR(100) NOT NULL,
+                    primeiro_acesso BOOLEAN DEFAULT TRUE
                 )
             '''))
-            result_users = conn.execute(text("SELECT COUNT(*) FROM usuarios")).scalar()
-            if result_users == 0:
+            # Tabela Metas de Vagas
+            conn.execute(text('''
+                CREATE TABLE IF NOT EXISTS metas_vagas (
+                    id SERIAL PRIMARY KEY,
+                    local VARCHAR(50) NOT NULL,
+                    setor VARCHAR(100) NOT NULL,
+                    meta INTEGER DEFAULT 0,
+                    UNIQUE(local, setor)
+                )
+            '''))
+            
+            # Cria admin padrão se vazio
+            if conn.execute(text("SELECT COUNT(*) FROM users_v3")).scalar() == 0:
                 conn.execute(text('''
-                    INSERT INTO usuarios (username, senha, perfil, nome) VALUES 
-                    ('bruno.admin', '123', 'Admin', 'Bruno Silva'),
-                    ('rh.user', '123', 'Usuario', 'Analista Base')
+                    INSERT INTO users_v3 (username, senha, perfil, nome, primeiro_acesso) VALUES 
+                    ('bruno.admin', '123', 'Admin', 'Bruno Silva', FALSE)
                 '''))
+                
+            # Popula as metas iniciais se a tabela estiver vazia
+            if conn.execute(text("SELECT COUNT(*) FROM metas_vagas")).scalar() == 0:
+                for loc, setores in DEFAULT_ALVOS.items():
+                    for setr, meta in setores.items():
+                        conn.execute(text("INSERT INTO metas_vagas (local, setor, meta) VALUES (:l, :s, :m)"), 
+                                     {"l": loc, "s": setr, "m": meta})
             conn.commit()
 
-    # --- Funções de Usuários (Login) ---
+    # --- Funções de Metas (Configurações) ---
+    def ler_metas(self) -> pd.DataFrame:
+        return pd.read_sql("SELECT local, setor, meta FROM metas_vagas ORDER BY local, setor", self.engine)
+
+    def atualizar_metas(self, df_metas, usuario):
+        with self.engine.connect() as conn:
+            for _, row in df_metas.iterrows():
+                conn.execute(text("UPDATE metas_vagas SET meta = :m WHERE local = :l AND setor = :s"),
+                             {"m": row['meta'], "l": row['local'], "s": row['setor']})
+            conn.commit()
+        self.registrar_log(usuario, "Atualização de Metas", "Alterou os parâmetros de vagas no painel de configurações.")
+
+    # --- Funções de Usuários ---
     def autenticar_usuario(self, username, senha):
         with self.engine.connect() as conn:
-            result = conn.execute(text("SELECT username, senha, perfil, nome FROM usuarios WHERE username = :usr AND senha = :pwd"), 
+            result = conn.execute(text("SELECT username, senha, perfil, nome, primeiro_acesso FROM users_v3 WHERE username = :usr AND senha = :pwd"), 
                                   {"usr": username, "pwd": senha}).fetchone()
-            if result:
-                return {"username": result[0], "senha": result[1], "perfil": result[2], "nome": result[3]}
+            if result: return {"username": result[0], "senha": result[1], "perfil": result[2], "nome": result[3], "primeiro_acesso": result[4]}
             return None
 
     def criar_usuario(self, username, senha, perfil, nome):
         with self.engine.connect() as conn:
             try:
-                conn.execute(text("INSERT INTO usuarios (username, senha, perfil, nome) VALUES (:usr, :pwd, :prf, :nom)"),
+                conn.execute(text("INSERT INTO users_v3 (username, senha, perfil, nome, primeiro_acesso) VALUES (:usr, :pwd, :prf, :nom, TRUE)"),
                              {"usr": username, "pwd": senha, "prf": perfil, "nom": nome})
                 conn.commit()
                 return True
             except:
                 return False 
 
+    def atualizar_senha(self, username, nova_senha):
+        with self.engine.connect() as conn:
+            conn.execute(text("UPDATE users_v3 SET senha = :pwd, primeiro_acesso = FALSE WHERE username = :usr"), {"pwd": nova_senha, "usr": username})
+            conn.commit()
+            
+    def atualizar_usuario_info(self, id_usr, nome, perfil):
+        with self.engine.connect() as conn:
+            conn.execute(text("UPDATE users_v3 SET nome = :n, perfil = :p WHERE id = :id"), {"n": nome, "p": perfil, "id": id_usr})
+            conn.commit()
+
     def listar_usuarios(self) -> pd.DataFrame:
-        return pd.read_sql("SELECT id, nome, username, perfil FROM usuarios ORDER BY id ASC", self.engine)
+        return pd.read_sql("SELECT id, nome, username, perfil, primeiro_acesso FROM users_v3 ORDER BY id ASC", self.engine)
 
     def excluir_usuario(self, username):
         with self.engine.connect() as conn:
             try:
-                conn.execute(text("DELETE FROM usuarios WHERE username = :usr"), {"usr": username})
+                conn.execute(text("DELETE FROM users_v3 WHERE username = :usr"), {"usr": username})
                 conn.commit()
                 return True
             except:
@@ -158,8 +196,7 @@ class DatabaseManager:
     def registrar_log(self, usuario, acao, detalhes=""):
         with self.engine.connect() as conn:
             conn.execute(text('''
-                INSERT INTO auditoria_logs (data_hora, usuario, acao, detalhes)
-                VALUES (:dh, :usr, :acao, :det)
+                INSERT INTO auditoria_logs (data_hora, usuario, acao, detalhes) VALUES (:dh, :usr, :acao, :det)
             '''), {"dh": datetime.now(), "usr": usuario, "acao": acao, "det": detalhes})
             conn.commit()
 
@@ -167,92 +204,92 @@ class DatabaseManager:
         return pd.read_sql("SELECT * FROM auditoria_logs ORDER BY data_hora DESC LIMIT 100", self.engine)
 
     def ler_dados(self) -> pd.DataFrame:
-        return pd.read_sql("SELECT * FROM colaboradores ORDER BY id DESC", self.engine)
+        return pd.read_sql("SELECT * FROM colab_v3 ORDER BY id DESC", self.engine)
 
     def adicionar_colaborador(self, dados: dict, usuario: str):
         with self.engine.connect() as conn:
+            try:
+                conn.execute(text('''
+                    INSERT INTO colab_v3 (nome, email, raca, genero, local, setor, status)
+                    VALUES (:nome, :email, :raca, :genero, :local, :setor, :status)
+                '''), dados)
+                conn.commit()
+                self.registrar_log(usuario, "Cadastro de Colaborador", f"Adicionado: {dados['nome']}")
+                return True
+            except:
+                return False
+                
+    def atualizar_colaborador(self, id_colab, nome, genero, local, setor, status, email, raca):
+        with self.engine.connect() as conn:
             conn.execute(text('''
-                INSERT INTO colaboradores (nome, cpf, rg, email, raca, genero, local, setor, status)
-                VALUES (:nome, :cpf, :rg, :email, :raca, :genero, :local, :setor, 'Ativo')
-            '''), dados)
+                UPDATE colab_v3 SET nome=:n, genero=:g, local=:l, setor=:s, status=:st, email=:e, raca=:r WHERE id=:id
+            '''), {"n": nome, "g": genero, "l": local, "s": setor, "st": status, "e": email, "r": raca, "id": id_colab})
             conn.commit()
-        self.registrar_log(usuario, "Cadastro de Colaborador", f"Adicionado: {dados['nome']}")
 
     def importar_massa(self, df_importacao: pd.DataFrame, usuario: str):
         registros_inseridos = 0
         with self.engine.connect() as conn:
             for _, row in df_importacao.iterrows():
-                nome = str(row.get('nome', ''))
-                cpf = str(row.get('cpf', ''))
-                if nome and cpf and nome != 'nan' and cpf != 'nan':
+                nome = str(row.get('nome', '')).strip()
+                if nome and nome != 'nan':
                     try:
                         conn.execute(text('''
-                            INSERT INTO colaboradores (nome, cpf, rg, email, raca, genero, local, setor, status)
-                            VALUES (:nome, :cpf, :rg, :email, :raca, :genero, :local, :setor, 'Ativo')
-                            ON CONFLICT (cpf) DO NOTHING
+                            INSERT INTO colab_v3 (nome, genero, local, setor, status, email, raca)
+                            VALUES (:nome, :genero, :local, :setor, :status, '', 'Não Informado')
+                            ON CONFLICT (nome) DO UPDATE SET 
+                            genero = EXCLUDED.genero, local = EXCLUDED.local, 
+                            setor = EXCLUDED.setor, status = EXCLUDED.status
                         '''), {
-                            "nome": nome, "cpf": cpf, "rg": str(row.get('rg', '')),
-                            "email": str(row.get('email', '')), "raca": str(row.get('raca', 'Não Informado')),
-                            "genero": str(row.get('genero', 'Não Informado')), "local": str(row.get('local', 'Não Informado')),
-                            "setor": str(row.get('setor', 'Não Informado'))
+                            "nome": nome, "genero": str(row.get('genero', 'Não Informado')),
+                            "local": str(row.get('local', 'Não Informado')), "setor": str(row.get('setor', 'Não Informado')),
+                            "status": str(row.get('status', 'Ativo'))
                         })
                         registros_inseridos += 1
-                    except:
-                        pass 
+                    except: pass 
             conn.commit()
-        if registros_inseridos > 0:
-            self.registrar_log(usuario, "Importação em Massa", f"Foram inseridos {registros_inseridos} novos colaboradores.")
+        if registros_inseridos > 0: self.registrar_log(usuario, "Importação em Massa", f"Processados {registros_inseridos} colaboradores.")
         return registros_inseridos
 
 @st.cache_resource
 def iniciar_conexao_banco():
     return DatabaseManager()
 
-# ==========================================
-# MÓDULO LGPD (Mascaramento de Dados)
-# ==========================================
 def aplicar_lgpd(df: pd.DataFrame, perfil_usuario: str) -> pd.DataFrame:
-    if perfil_usuario == 'Admin' or df.empty:
-        return df
+    if perfil_usuario == 'Admin' or df.empty: return df
     df_mascarado = df.copy()
-    def mascarar_cpf(cpf):
-        cpf = str(cpf)
-        return f"***.{cpf[4:7]}.{cpf[8:11]}-**" if len(cpf) > 10 else "***.***.***-**"
     def mascarar_email(email):
         email = str(email)
-        return f"{email[0]}***@{email.split('@')[-1]}" if '@' in email else "***@***.com"
-
-    if 'cpf' in df_mascarado.columns: df_mascarado['cpf'] = df_mascarado['cpf'].apply(mascarar_cpf)
-    if 'rg' in df_mascarado.columns: df_mascarado['rg'] = "***.***.**"
+        return f"{email[0]}***@{email.split('@')[-1]}" if '@' in email else ""
     if 'email' in df_mascarado.columns: df_mascarado['email'] = df_mascarado['email'].apply(mascarar_email)
     return df_mascarado
 
 def render_status_badge(status):
-    if "ATIVO" in status: return f'<span class="badge-status bg-active">{status}</span>'
-    elif "PRÉVIA" in status or "SHORTLISTING" in status: return f'<span class="badge-status bg-short">{status}</span>'
+    status_up = str(status).upper()
+    if "ATIVO" in status_up: return f'<span class="badge-status bg-active">{status}</span>'
+    elif "PRÉVIA" in status_up or "SHORTLISTING" in status_up: return f'<span class="badge-status bg-short">{status}</span>'
     else: return f'<span class="badge-status bg-urgent">{status}</span>'
 
 
 # ==========================================
-# SISTEMA DE LOGIN (Sessão)
+# SISTEMA DE LOGIN E TROCA DE SENHA
 # ==========================================
+db = iniciar_conexao_banco()
+
 def tela_login():
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
         st.markdown('<div class="css-card">', unsafe_allow_html=True)
         st.subheader("🔒 Acesso Seguro")
-        usuario = st.text_input("Usuário")
+        usuario = st.text_input("Usuário (Minúsculo)").lower()
         senha = st.text_input("Senha", type="password")
         
         if st.button("Entrar", type="primary", use_container_width=True):
-            banco_temp = iniciar_conexao_banco()
-            user_auth = banco_temp.autenticar_usuario(usuario, senha)
-            
+            user_auth = db.autenticar_usuario(usuario, senha)
             if user_auth:
                 st.session_state['logado'] = True
                 st.session_state['usuario_atual'] = user_auth
-                banco_temp.registrar_log(user_auth["nome"], "Login no Sistema")
+                db.registrar_log(user_auth["nome"], "Login no Sistema")
                 st.rerun()
             else:
                 st.error("Credenciais inválidas.")
@@ -263,17 +300,34 @@ if not st.session_state['logado']:
     tela_login()
     st.stop()
 
+# VERIFICAÇÃO DE PRIMEIRO ACESSO
+if st.session_state['usuario_atual']['primeiro_acesso']:
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns([1, 1.5, 1])
+    with c2:
+        st.markdown('<div class="css-card" style="border-top: 5px solid #005F60;">', unsafe_allow_html=True)
+        st.subheader("⚠️ Troca de Senha Obrigatória")
+        st.write("Bem-vindo(a)! Como este é o seu primeiro acesso, crie uma senha pessoal e segura.")
+        nova_senha = st.text_input("Nova Senha", type="password")
+        confirma_senha = st.text_input("Confirme a Senha", type="password")
+        if st.button("Salvar e Acessar o Sistema", type="primary", use_container_width=True):
+            if len(nova_senha) < 4: st.error("A senha deve ter pelo menos 4 caracteres.")
+            elif nova_senha != confirma_senha: st.error("As senhas não coincidem.")
+            else:
+                db.atualizar_senha(st.session_state['usuario_atual']['username'], nova_senha)
+                st.session_state['usuario_atual']['primeiro_acesso'] = False
+                st.success("Senha atualizada! Redirecionando...")
+                st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+    st.stop()
+
 
 # ==========================================
 # APLICAÇÃO PRINCIPAL E CÁLCULOS DINÂMICOS
 # ==========================================
-db = iniciar_conexao_banco()
 usuario_logado = st.session_state['usuario_atual']
-
-# Lendo os dados reais do banco
 df_colab = db.ler_dados()
 
-# Calculando todos os KPIs e Departamentos de forma DINÂMICA
 total_colaboradores = len(df_colab)
 total_inativos = len(df_colab[df_colab['status'] == 'Inativo']) if not df_colab.empty else 0
 
@@ -282,7 +336,11 @@ sede_count = len(df_colab[df_colab['local'] == 'SEDE']) if not df_colab.empty el
 pf_count = len(df_colab[df_colab['local'] == 'PF']) if not df_colab.empty else 0
 ppd_count = len(df_colab[df_colab['local'] == 'PPD']) if not df_colab.empty else 0
 
-def count_setor(local, setor):
+def count_setor_ativos(local, setor):
+    if df_colab.empty: return 0
+    return len(df_colab[(df_colab['local'] == local) & (df_colab['setor'] == setor) & (df_colab['status'] != 'Inativo')])
+
+def count_setor_todos(local, setor):
     if df_colab.empty: return 0
     return len(df_colab[(df_colab['local'] == local) & (df_colab['setor'] == setor)])
 
@@ -297,45 +355,47 @@ with st.sidebar:
     
     opcoes_menu = ["Home - Dashboard", "Gestão de Pessoas", "Integração de Dados (Planilhas)"]
     if usuario_logado['perfil'] == 'Admin':
+        opcoes_menu.append("Configurações ⚙️")
         opcoes_menu.append("Auditoria e Logs 🔐")
         
     menu_selecionado = st.radio("Navegação", opcoes_menu)
     
-    # --- ÁREA EXCLUSIVA DE ADMIN: GESTÃO DE USUÁRIOS ---
     if usuario_logado['perfil'] == 'Admin':
         st.markdown("---")
         with st.expander("⚙️ Gestão de Usuários (Acessos)"):
-            tab_add, tab_list = st.tabs(["➕ Criar", "📋 Listar / Excluir"])
-            
+            tab_add, tab_list = st.tabs(["➕ Criar", "📋 Editar/Excluir"])
             with tab_add:
                 with st.form("form_novo_user"):
                     novo_nome = st.text_input("Nome Completo")
-                    novo_usr = st.text_input("Login")
-                    nova_senha = st.text_input("Senha", type="password")
+                    novo_usr = st.text_input("Login").lower()
+                    nova_senha = st.text_input("Senha Temporária", type="password")
                     novo_perfil = st.selectbox("Perfil", ["Usuario", "Admin"])
                     if st.form_submit_button("Salvar Usuário", use_container_width=True):
                         if novo_nome and novo_usr and nova_senha:
                             if db.criar_usuario(novo_usr, nova_senha, novo_perfil, novo_nome):
                                 db.registrar_log(usuario_logado['nome'], "Criação de Usuário", f"Criou o login '{novo_usr}'")
-                                st.success(f"Usuário criado!")
-                            else:
-                                st.error("Erro: Login já existe.")
-                        else:
-                            st.warning("Preencha tudo.")
+                                st.success("Usuário criado!")
+                            else: st.error("Erro: Login já existe.")
+                        else: st.warning("Preencha tudo.")
             
             with tab_list:
                 df_users = db.listar_usuarios()
                 for _, u in df_users.iterrows():
-                    colA, colB = st.columns([3, 1])
-                    with colA:
-                        st.markdown(f"**{u['nome']}**<br><small>{u['username']} ({u['perfil']})</small>", unsafe_allow_html=True)
-                    with colB:
-                        if u['username'] != 'bruno.admin': # Proteção para não excluir o root
-                            if st.button("🗑️", key=f"del_{u['username']}", help="Excluir"):
-                                db.excluir_usuario(u['username'])
-                                db.registrar_log(usuario_logado['nome'], "Exclusão de Usuário", f"Excluiu o login '{u['username']}'")
+                    with st.expander(f"{u['nome']} ({u['perfil']})"):
+                        e_nome = st.text_input("Nome", value=u['nome'], key=f"e_n_{u['id']}")
+                        e_perf = st.selectbox("Perfil", ["Usuario", "Admin"], index=0 if u['perfil']=='Usuario' else 1, key=f"e_p_{u['id']}")
+                        colA, colB = st.columns(2)
+                        with colA:
+                            if st.button("Salvar Edição", key=f"sv_{u['id']}"):
+                                db.atualizar_usuario_info(u['id'], e_nome, e_perf)
+                                st.success("Atualizado!")
                                 st.rerun()
-                    st.divider()
+                        with colB:
+                            if u['username'] != 'bruno.admin': 
+                                if st.button("🗑️ Excluir", key=f"del_{u['id']}"):
+                                    db.excluir_usuario(u['username'])
+                                    db.registrar_log(usuario_logado['nome'], "Exclusão", f"Excluiu '{u['username']}'")
+                                    st.rerun()
 
     st.markdown("<br><br>", unsafe_allow_html=True)
     if st.button("🚪 Sair", use_container_width=True):
@@ -347,242 +407,250 @@ with st.sidebar:
 col_titulo, col_vazia, col_export = st.columns([3, 1, 1])
 with col_titulo:
     st.title(menu_selecionado.split(" - ")[0])
-with col_export:
-    st.markdown("<br>", unsafe_allow_html=True)
-    csv = df_exibicao_segura.to_csv(index=False).encode('utf-8')
-    if st.download_button("📥 Exportar Relatórios", data=csv, file_name='relatorio_rh.csv', mime='text/csv', use_container_width=True):
-        db.registrar_log(usuario_logado['nome'], "Exportação de Dados", "Base de dados baixada.")
 
 
 # ==========================================
-# TELA 1: HOME (DASHBOARD) - RECRIAÇÃO FIEL DINÂMICA
+# TELA 1: HOME (DASHBOARD)
 # ==========================================
 if menu_selecionado == "Home - Dashboard":
-    # 1. KPIs Principais (Destaque Topo)
     k1, k2 = st.columns(2)
     with k1:
-        st.markdown(f"""
-            <div class="kpi-main-card">
-                <div class="kpi-main-title">TOTAL DE COLABORADORES</div>
-                <div class="kpi-main-value">{total_colaboradores}</div>
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f'<div class="kpi-main-card"><div class="kpi-main-title">TOTAL DE COLABORADORES</div><div class="kpi-main-value">{total_colaboradores}</div></div>', unsafe_allow_html=True)
     with k2:
-        st.markdown(f"""
-            <div class="kpi-main-card" style="background-color: #F9FAFB;">
-                <div class="kpi-main-title">INATIVOS</div>
-                <div class="kpi-main-value" style="color: #9CA3AF;">{total_inativos}</div>
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f'<div class="kpi-main-card" style="background-color: #F9FAFB;"><div class="kpi-main-title">INATIVOS</div><div class="kpi-main-value" style="color: #9CA3AF;">{total_inativos}</div></div>', unsafe_allow_html=True)
 
-    # 2. KPIs Secundários (Headcounts por Local)
     st.markdown("<br>", unsafe_allow_html=True)
     h1, h2, h3, h4 = st.columns(4)
-    with h1:
-        st.markdown(f'<div class="kpi-sub-card border-pj"><div class="kpi-sub-title">PJ HEADCOUNT</div><div class="kpi-sub-value">{pj_count} <span class="kpi-sub-label">Total</span></div></div>', unsafe_allow_html=True)
-    with h2:
-        st.markdown(f'<div class="kpi-sub-card border-sede"><div class="kpi-sub-title">SEDE HEADCOUNT</div><div class="kpi-sub-value">{sede_count} <span class="kpi-sub-label">Total</span></div></div>', unsafe_allow_html=True)
-    with h3:
-        st.markdown(f'<div class="kpi-sub-card border-pf"><div class="kpi-sub-title">PF HEADCOUNT</div><div class="kpi-sub-value">{pf_count} <span class="kpi-sub-label">Total</span></div></div>', unsafe_allow_html=True)
-    with h4:
-        st.markdown(f'<div class="kpi-sub-card border-ppd"><div class="kpi-sub-title">PPD HEADCOUNT</div><div class="kpi-sub-value">{ppd_count} <span class="kpi-sub-label">Total</span></div></div>', unsafe_allow_html=True)
+    with h1: st.markdown(f'<div class="kpi-sub-card border-pj"><div class="kpi-sub-title">PJ</div><div class="kpi-sub-value">{pj_count}</div></div>', unsafe_allow_html=True)
+    with h2: st.markdown(f'<div class="kpi-sub-card border-sede"><div class="kpi-sub-title">SEDE</div><div class="kpi-sub-value">{sede_count}</div></div>', unsafe_allow_html=True)
+    with h3: st.markdown(f'<div class="kpi-sub-card border-pf"><div class="kpi-sub-title">PF</div><div class="kpi-sub-value">{pf_count}</div></div>', unsafe_allow_html=True)
+    with h4: st.markdown(f'<div class="kpi-sub-card border-ppd"><div class="kpi-sub-title">PPD</div><div class="kpi-sub-value">{ppd_count}</div></div>', unsafe_allow_html=True)
 
-    # 3. Distribuição Departamental (Dinâmica baseada no BD)
+    # --- EDIÇÃO DIRETA NAS LISTAS E EXPORTAÇÃO ---
+    with st.expander("📊 Clique aqui para Listar/Editar/Exportar dados dos KPIs Acima"):
+        filtro_relatorio = st.radio("Selecione o filtro:", ["Listar Ativos", "Listar Inativos", "Listar Afastados", "Listar PJ", "Listar SEDE", "Listar PF", "Listar Todos"], horizontal=True)
+        
+        df_view = df_exibicao_segura.copy()
+        if filtro_relatorio == "Listar Ativos": df_view = df_view[df_view['status'] == 'Ativo']
+        elif filtro_relatorio == "Listar Inativos": df_view = df_view[df_view['status'] == 'Inativo']
+        elif filtro_relatorio == "Listar Afastados": df_view = df_view[df_view['status'] == 'Afastado']
+        elif filtro_relatorio == "Listar PJ": df_view = df_view[df_view['local'] == 'PJ']
+        elif filtro_relatorio == "Listar SEDE": df_view = df_view[df_view['local'] == 'SEDE']
+        elif filtro_relatorio == "Listar PF": df_view = df_view[df_view['local'] == 'PF']
+        
+        if usuario_logado['perfil'] == 'Admin' and not df_view.empty:
+            st.caption("Você é Admin. Dê um clique duplo na célula para corrigir nomes, locais ou mudar o status. Depois clique em 'Salvar'.")
+            edited_df = st.data_editor(df_view, use_container_width=True, hide_index=True, disabled=["id", "email"])
+            c1, c2 = st.columns([1, 4])
+            with c1:
+                if st.button("💾 Salvar Alterações na Base", type="primary"):
+                    try:
+                        for _, row in edited_df.iterrows():
+                            db.atualizar_colaborador(row['id'], row['nome'], row['genero'], row['local'], row['setor'], row['status'], row.get('email', ''), row.get('raca', ''))
+                        st.success("Dados atualizados com sucesso!")
+                        st.rerun()
+                    except Exception as e: st.error(f"Erro ao salvar: {e}")
+        else:
+            st.dataframe(df_view, use_container_width=True, hide_index=True)
+            
+        if not df_view.empty:
+            csv_kpi = df_view.to_csv(index=False).encode('utf-8')
+            st.download_button(f"📥 Exportar Planilha", data=csv_kpi, file_name=f'relatorio_{filtro_relatorio.replace(" ", "_").lower()}.csv', mime='text/csv')
+
+
+    # --- DISTRIBUIÇÃO DEPARTAMENTAL ---
     st.markdown('<div class="section-title" style="display:flex; justify-content:space-between;"><span>Distribuição Departamental</span><span style="font-size:0.75rem; color:#9CA3AF; text-transform:uppercase; font-weight:600;">Mapeamento Organizacional</span></div>', unsafe_allow_html=True)
-    
     col_pj, col_sede, col_pf = st.columns(3)
     
     with col_pj:
-        st.markdown(f'<div class="dept-header"><span class="dept-title"><span class="dot-pj"></span>PJ (Jurídico)</span><span class="dept-total-badge">{pj_count}</span></div>', unsafe_allow_html=True)
-        # Itens Largura Total
-        st.markdown(f'<div class="dept-item"><span class="dept-name">Cálculos</span><span class="dept-num">{count_setor("PJ", "Cálculos")}</span></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="dept-item"><span class="dept-name">Obrigação de Fazer</span><span class="dept-num">{count_setor("PJ", "Obrigação de Fazer")}</span></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="dept-item"><span class="dept-name">OPV</span><span class="dept-num">{count_setor("PJ", "OPV")}</span></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="dept-item"><span class="dept-name">Litispendência</span><span class="dept-num">{count_setor("PJ", "Litispendência")}</span></div>', unsafe_allow_html=True)
-        # Grid 2x2
-        g1, g2 = st.columns(2)
-        with g1:
-            st.markdown(f'<div class="dept-item" style="flex-direction:column; padding:0.5rem;"><span class="dept-name" style="font-size:0.7rem;">Detran</span><span class="dept-num">{count_setor("PJ", "Detran")}</span></div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="dept-item" style="flex-direction:column; padding:0.5rem;"><span class="dept-name" style="font-size:0.7rem;">Precatórios</span><span class="dept-num">{count_setor("PJ", "Precatórios")}</span></div>', unsafe_allow_html=True)
-        with g2:
-            st.markdown(f'<div class="dept-item" style="flex-direction:column; padding:0.5rem;"><span class="dept-name" style="font-size:0.7rem;">TI</span><span class="dept-num">{count_setor("PJ", "TI")}</span></div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="dept-item" style="flex-direction:column; padding:0.5rem;"><span class="dept-name" style="font-size:0.7rem;">NPM</span><span class="dept-num">{count_setor("PJ", "NPM")}</span></div>', unsafe_allow_html=True)
-        st.markdown('<p style="text-align:center; font-size:0.75rem; color:#005F60; font-weight:700; cursor:pointer;">VER MAIS 6 DEPARTAMENTOS</p>', unsafe_allow_html=True)
+        st.markdown(f'<div class="dept-header"><span class="dept-title"><span class="dot-pj"></span>Procuradoria Judicial</span><span class="dept-total-badge">{pj_count}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="dept-item"><span class="dept-name">Cálculos</span><span class="dept-num">{count_setor_todos("PJ", "Cálculos")}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="dept-item"><span class="dept-name">Obrigação de Fazer</span><span class="dept-num">{count_setor_todos("PJ", "Obrigação de Fazer")}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="dept-item"><span class="dept-name">OPV</span><span class="dept-num">{count_setor_todos("PJ", "OPV")}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="dept-item"><span class="dept-name">Litispendência</span><span class="dept-num">{count_setor_todos("PJ", "Litispendência")}</span></div>', unsafe_allow_html=True)
+        with st.expander("VER MAIS DEPARTAMENTOS"):
+            st.markdown(f'<div class="dept-item"><span class="dept-name">Detran</span><span class="dept-num">{count_setor_todos("PJ", "Detran")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">Precatórios</span><span class="dept-num">{count_setor_todos("PJ", "Precatórios")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">TI</span><span class="dept-num">{count_setor_todos("PJ", "TI")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">NPM</span><span class="dept-num">{count_setor_todos("PJ", "NPM")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">Cadastro Requisitórios</span><span class="dept-num">{count_setor_todos("PJ", "Cadastro Requisitórios")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">Trabalhista</span><span class="dept-num">{count_setor_todos("PJ", "Trabalhista")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">Cartografia</span><span class="dept-num">{count_setor_todos("PJ", "Cartografia")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">NRST</span><span class="dept-num">{count_setor_todos("PJ", "NRST")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">Nomeação Contador</span><span class="dept-num">{count_setor_todos("PJ", "Nomeação Contador")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">NIRA</span><span class="dept-num">{count_setor_todos("PJ", "NIRA")}</span></div>', unsafe_allow_html=True)
 
     with col_sede:
-        st.markdown(f'<div class="dept-header"><span class="dept-title"><span class="dot-sede"></span>SEDE (Admin)</span><span class="dept-total-badge">{sede_count}</span></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="dept-item"><span class="dept-name">Cadastro</span><span class="dept-num">{count_setor("SEDE", "Cadastro")}</span></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="dept-item"><span class="dept-name">APJ</span><span class="dept-num">{count_setor("SEDE", "APJ")}</span></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="dept-item"><span class="dept-name">Auxílio Saúde</span><span class="dept-num">{count_setor("SEDE", "Auxílio Saúde")}</span></div>', unsafe_allow_html=True)
-        g1, g2 = st.columns(2)
-        with g1:
-            st.markdown(f'<div class="dept-item" style="flex-direction:column; padding:0.5rem;"><span class="dept-name" style="font-size:0.7rem;">DOF</span><span class="dept-num">{count_setor("SEDE", "DOF")}</span></div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="dept-item" style="flex-direction:column; padding:0.5rem;"><span class="dept-name" style="font-size:0.7rem;">C. Estudos</span><span class="dept-num">{count_setor("SEDE", "Centro de Estudos")}</span></div>', unsafe_allow_html=True)
-        with g2:
-            st.markdown(f'<div class="dept-item" style="flex-direction:column; padding:0.5rem;"><span class="dept-name" style="font-size:0.7rem;">Transação</span><span class="dept-num">{count_setor("SEDE", "Transação")}</span></div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="dept-item" style="flex-direction:column; padding:0.5rem;"><span class="dept-name" style="font-size:0.7rem;">ATIC</span><span class="dept-num">{count_setor("SEDE", "ATIC")}</span></div>', unsafe_allow_html=True)
-        st.markdown('<p style="text-align:center; font-size:0.75rem; color:#6B7280; font-weight:700; cursor:pointer;">VER MAIS 6 DEPARTAMENTOS</p>', unsafe_allow_html=True)
+        st.markdown(f'<div class="dept-header"><span class="dept-title"><span class="dot-sede"></span>SEDE</span><span class="dept-total-badge">{sede_count}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="dept-item"><span class="dept-name">Cadastro</span><span class="dept-num">{count_setor_todos("SEDE", "Cadastro")}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="dept-item"><span class="dept-name">APJ</span><span class="dept-num">{count_setor_todos("SEDE", "APJ")}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="dept-item"><span class="dept-name">Auxílio Saúde</span><span class="dept-num">{count_setor_todos("SEDE", "Auxílio Saúde")}</span></div>', unsafe_allow_html=True)
+        with st.expander("VER MAIS DEPARTAMENTOS"):
+            st.markdown(f'<div class="dept-item"><span class="dept-name">DOF</span><span class="dept-num">{count_setor_todos("SEDE", "DOF")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">Transação</span><span class="dept-num">{count_setor_todos("SEDE", "Transação")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">Centro de Estudos</span><span class="dept-num">{count_setor_todos("SEDE", "Centro de Estudos")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">ATIC</span><span class="dept-num">{count_setor_todos("SEDE", "ATIC")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">PDA</span><span class="dept-num">{count_setor_todos("SEDE", "PDA")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">Saneamento</span><span class="dept-num">{count_setor_todos("SEDE", "Saneamento")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">CSAC</span><span class="dept-num">{count_setor_todos("SEDE", "CSAC")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">Subcontencioso</span><span class="dept-num">{count_setor_todos("SEDE", "Subcontencioso")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">CGP</span><span class="dept-num">{count_setor_todos("SEDE", "CGP")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">Consultoria</span><span class="dept-num">{count_setor_todos("SEDE", "Consultoria")}</span></div>', unsafe_allow_html=True)
 
     with col_pf:
-        st.markdown(f'<div class="dept-header"><span class="dept-title"><span class="dot-pf"></span>PF (Pessoa Física)</span><div><span style="font-size:0.75rem; color:#7DD3FC; margin-right:5px;">{pf_count}</span><span class="dept-total-badge" style="background-color:#FFF7ED; color:#9A3412;">PPD: {ppd_count}</span></div></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="dept-item"><span class="dept-name">Cálculos</span><span class="dept-num" style="color:#7DD3FC;">{count_setor("PF", "Cálculos")}</span></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="dept-item"><span class="dept-name">Fazenda Autora</span><span class="dept-num" style="color:#7DD3FC;">{count_setor("PF", "Fazenda Autora")}</span></div>', unsafe_allow_html=True)
-        g1, g2 = st.columns(2)
-        with g1:
-            st.markdown(f'<div class="dept-item" style="flex-direction:column; padding:0.5rem;"><span class="dept-name" style="font-size:0.7rem;">G. Crédito</span><span class="dept-num" style="color:#7DD3FC;">{count_setor("PF", "Gestão de Crédito")}</span></div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="dept-item" style="flex-direction:column; padding:0.5rem;"><span class="dept-name" style="font-size:0.7rem;">Pesquisa</span><span class="dept-num" style="color:#7DD3FC;">{count_setor("PF", "Pesquisa")}</span></div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="dept-item" style="flex-direction:column; padding:0.5rem;"><span class="dept-name" style="font-size:0.7rem;">Falência</span><span class="dept-num" style="color:#7DD3FC;">{count_setor("PF", "Falência")}</span></div>', unsafe_allow_html=True)
-        with g2:
-            st.markdown(f'<div class="dept-item" style="flex-direction:column; padding:0.5rem;"><span class="dept-name" style="font-size:0.7rem;">NASS</span><span class="dept-num" style="color:#7DD3FC;">{count_setor("PF", "NASS")}</span></div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="dept-item" style="flex-direction:column; padding:0.5rem;"><span class="dept-name" style="font-size:0.7rem;">ITCMD</span><span class="dept-num" style="color:#7DD3FC;">{count_setor("PF", "ITCMD")}</span></div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="dept-item" style="flex-direction:column; padding:0.5rem;"><span class="dept-name" style="font-size:0.7rem;">TUSD</span><span class="dept-num" style="color:#7DD3FC;">{count_setor("PF", "TUSD")}</span></div>', unsafe_allow_html=True)
-        st.markdown('<p style="text-align:center; font-size:0.75rem; color:#7DD3FC; font-weight:700; cursor:pointer;">VER MAIS 7 DEPARTAMENTOS</p>', unsafe_allow_html=True)
+        st.markdown(f'<div class="dept-header"><span class="dept-title"><span class="dot-pf"></span>PF (Procuradoria Fiscal)</span><div><span style="font-size:0.75rem; color:#7DD3FC; margin-right:5px;">{pf_count}</span><span class="dept-total-badge" style="background-color:#FFF7ED; color:#9A3412;">PPD: {ppd_count}</span></div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="dept-item"><span class="dept-name">Cálculos</span><span class="dept-num" style="color:#7DD3FC;">{count_setor_todos("PF", "Cálculos")}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="dept-item"><span class="dept-name">Fazenda Autora</span><span class="dept-num" style="color:#7DD3FC;">{count_setor_todos("PF", "Fazenda Autora")}</span></div>', unsafe_allow_html=True)
+        with st.expander("VER MAIS DEPARTAMENTOS"):
+            st.markdown(f'<div class="dept-item"><span class="dept-name">Gestão de Crédito</span><span class="dept-num" style="color:#7DD3FC;">{count_setor_todos("PF", "Gestão de Crédito")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">NASS</span><span class="dept-num" style="color:#7DD3FC;">{count_setor_todos("PF", "NASS")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">Pesquisa</span><span class="dept-num" style="color:#7DD3FC;">{count_setor_todos("PF", "Pesquisa")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">Falência</span><span class="dept-num" style="color:#7DD3FC;">{count_setor_todos("PF", "Falência")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">ITCMD</span><span class="dept-num" style="color:#7DD3FC;">{count_setor_todos("PF", "ITCMD")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">TUSD</span><span class="dept-num" style="color:#7DD3FC;">{count_setor_todos("PF", "TUSD")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">Cumprimento Geral</span><span class="dept-num" style="color:#7DD3FC;">{count_setor_todos("PF", "Cumprimento Geral")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">Subsídios / Falência</span><span class="dept-num" style="color:#7DD3FC;">{count_setor_todos("PF", "Subsídios / Falência")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">TI</span><span class="dept-num" style="color:#7DD3FC;">{count_setor_todos("PF", "TI")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">Arrematação</span><span class="dept-num" style="color:#7DD3FC;">{count_setor_todos("PF", "Arrematação")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">Levantamento</span><span class="dept-num" style="color:#7DD3FC;">{count_setor_todos("PF", "Levantamento")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">Multirão Garantia</span><span class="dept-num" style="color:#7DD3FC;">{count_setor_todos("PF", "Multirão Garantia")}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dept-item"><span class="dept-name">Jurimetria</span><span class="dept-num" style="color:#7DD3FC;">{count_setor_todos("PF", "Jurimetria")}</span></div>', unsafe_allow_html=True)
 
-    # 4. Vagas Abertas (Tabela com Filtros)
+    # --- CÁLCULO DINÂMICO DE VAGAS ABERTAS (Lendo as Metas do BD) ---
     st.markdown('<hr style="margin:2rem 0;">', unsafe_allow_html=True)
     v1, v2 = st.columns([1, 2])
-    with v1:
-        st.markdown('<div class="section-title" style="margin-top:0;">Vagas Abertas</div>', unsafe_allow_html=True)
-    with v2:
-        filtro_vaga = st.radio("Filtro", ["Tudo", "PJ", "SEDE", "PF", "PPD", "DETRAN"], horizontal=True, label_visibility="collapsed")
+    with v1: st.markdown('<div class="section-title" style="margin-top:0;">Vagas Abertas</div>', unsafe_allow_html=True)
+    with v2: filtro_vaga = st.radio("Filtro", ["Tudo", "PJ", "SEDE", "PF", "PPD"], horizontal=True, label_visibility="collapsed")
+    
+    # Processa as Vagas Dinâmicas
+    df_metas_banco = db.ler_metas()
+    lista_vagas_abertas = []
+    
+    for _, row in df_metas_banco.iterrows():
+        loc = row['local']
+        setr = row['setor']
+        alvo = row['meta']
+        
+        ativos_ocupando = count_setor_ativos(loc, setr)
+        vagas_restantes = alvo - ativos_ocupando
+        
+        if vagas_restantes > 0:
+            lista_vagas_abertas.append({
+                "Departamento": f"{loc} ({setr})",
+                "Título da Função": f"Vaga Alocada - {setr}",
+                "Vagas": str(vagas_restantes),
+                "Status": "RECRUTAMENTO ATIVO",
+                "Filtro": loc
+            })
+                
+    df_vagas_dinamico = pd.DataFrame(lista_vagas_abertas)
     
     st.markdown('<div class="kpi-main-card" style="padding: 0;">', unsafe_allow_html=True)
-    
-    colunas_header = st.columns([2, 3, 1, 2, 1])
-    headers = ["DEPARTAMENTO", "TÍTULO DA FUNÇÃO", "VAGAS", "STATUS", "AÇÃO"]
-    for i, h in enumerate(headers):
+    colunas_header = st.columns([2, 3, 1, 2])
+    for i, h in enumerate(["DEPARTAMENTO", "TÍTULO DA FUNÇÃO", "VAGAS ABERTAS", "STATUS"]):
         colunas_header[i].markdown(f"<span style='font-size:0.7rem; color:#9CA3AF; font-weight:700;'>{h}</span>", unsafe_allow_html=True)
     st.markdown("<hr style='margin: 0.5rem 0;'>", unsafe_allow_html=True)
     
-    df_vagas_filtrado = DADOS_VAGAS if filtro_vaga == "Tudo" else DADOS_VAGAS[DADOS_VAGAS['Filtro'] == filtro_vaga]
+    df_vagas_filtrado = df_vagas_dinamico if (filtro_vaga == "Tudo" or df_vagas_dinamico.empty) else df_vagas_dinamico[df_vagas_dinamico['Filtro'] == filtro_vaga]
     
     if df_vagas_filtrado.empty:
-        st.markdown("<p style='text-align:center; padding: 2rem; color: gray;'>Nenhuma vaga cadastrada para exibir no momento.</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center; padding: 2rem; color: gray;'>Quadro 100% completo! Nenhuma vaga aberta no momento.</p>", unsafe_allow_html=True)
     else:
         for _, row in df_vagas_filtrado.iterrows():
-            cols = st.columns([2, 3, 1, 2, 1])
+            cols = st.columns([2, 3, 1, 2])
             cols[0].markdown(f"**{row['Departamento']}**", unsafe_allow_html=True)
             cols[1].markdown(f"{row['Título da Função']}", unsafe_allow_html=True)
-            cols[2].markdown(f"**{row['Vagas']}**", unsafe_allow_html=True)
+            cols[2].markdown(f"<span style='font-weight:900; color:#005F60;'>{row['Vagas']}</span>", unsafe_allow_html=True)
             cols[3].markdown(render_status_badge(row['Status']), unsafe_allow_html=True)
-            cols[4].markdown("•••", unsafe_allow_html=True)
             st.markdown("<hr style='margin: 0.5rem 0; opacity: 0.5;'>", unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ==========================================
-# TELA 2: GESTÃO DE PESSOAS
+# TELA 2: CONFIGURAÇÕES DE VAGAS (Admin)
+# ==========================================
+elif menu_selecionado == "Configurações ⚙️":
+    st.markdown('<div class="css-card">', unsafe_allow_html=True)
+    st.subheader("⚙️ Configurações de Vagas por Departamento")
+    st.write("Abaixo você pode definir a quantidade alvo (Meta de Vagas) para cada setor. O sistema usará este valor para calcular automaticamente quantas vagas estão abertas subtraindo a quantidade de colaboradores ativos no setor.")
+    
+    df_metas_atual = db.ler_metas()
+    
+    st.caption("Dê um duplo clique na coluna 'meta' para alterar o número de vagas. Os outros campos são bloqueados.")
+    edited_metas = st.data_editor(df_metas_atual, use_container_width=True, hide_index=True, disabled=["local", "setor"])
+    
+    if st.button("💾 Salvar Novas Metas", type="primary"):
+        try:
+            db.atualizar_metas(edited_metas, usuario_logado['nome'])
+            st.success("Metas atualizadas com sucesso! O cálculo de vagas abertas no Dashboard já reflete os novos números.")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Erro ao salvar metas: {e}")
+            
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ==========================================
+# TELA 3: GESTÃO DE PESSOAS
 # ==========================================
 elif menu_selecionado == "Gestão de Pessoas":
     st.markdown('<div class="css-card">', unsafe_allow_html=True)
-    st.subheader("➕ Novo Cadastro (Requerido LGPD)")
+    st.subheader("➕ Novo Cadastro")
     
     with st.form("form_novo_colab"):
-        st.write("Dados Pessoais (Protegidos)")
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3 = st.columns([2, 2, 1])
         nome = col1.text_input("Nome Completo*")
-        cpf = col2.text_input("CPF* (Apenas números)")
-        rg = col3.text_input("RG")
+        email = col2.text_input("E-mail Corporativo")
+        genero = col3.selectbox("Gênero", ["Não Informado", "Masculino", "Feminino", "Outro"])
         
-        col4, col5, col6 = st.columns(3)
-        email = col4.text_input("E-mail Corporativo")
-        raca = col5.selectbox("Raça/Cor", ["Não Informado", "Branca", "Preta", "Parda", "Amarela", "Indígena"])
-        genero = col6.selectbox("Gênero", ["Não Informado", "Masculino", "Feminino", "Outro"])
-        
-        st.markdown("---")
-        st.write("Alocação Organizacional")
-        col7, col8 = st.columns(2)
-        local_selecionado = col7.selectbox("Local (Matriz/Filial)*", list(ESTRUTURA.keys()))
-        setor_selecionado = col8.selectbox("Setor Alocado*", ESTRUTURA[local_selecionado])
+        col4, col5, col6 = st.columns([1.5, 2, 1])
+        local_selecionado = col4.selectbox("Local*", list(ESTRUTURA.keys()))
+        setor_selecionado = col5.selectbox("Setor Alocado*", ESTRUTURA[local_selecionado])
+        status = col6.selectbox("Status", ["Ativo", "Afastado", "Inativo"])
         
         if st.form_submit_button("Registrar Colaborador", type="primary"):
-            if nome and cpf:
-                dados_novos = {
-                    "nome": nome, "cpf": cpf, "rg": rg, "email": email, 
-                    "raca": raca, "genero": genero, "local": local_selecionado, "setor": setor_selecionado
-                }
-                db.adicionar_colaborador(dados_novos, usuario_logado['nome'])
-                st.success(f"Cadastro de {nome} realizado com sucesso!")
-                st.rerun()
-            else:
-                st.warning("Nome e CPF são campos obrigatórios.")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="css-card">', unsafe_allow_html=True)
-    st.subheader("📋 Base de Dados (Visão Restrita)")
-    if usuario_logado['perfil'] != 'Admin':
-        st.warning("⚠️ Você está visualizando dados anonimizados conforme diretrizes da LGPD.")
-    st.dataframe(df_exibicao_segura, use_container_width=True, hide_index=True)
+            if nome:
+                dados_novos = {"nome": nome.strip(), "email": email, "raca": "Não Informado", "genero": genero, "local": local_selecionado, "setor": setor_selecionado, "status": status}
+                if db.adicionar_colaborador(dados_novos, usuario_logado['nome']):
+                    st.success(f"Cadastro de {nome} realizado com sucesso!")
+                    st.rerun()
+                else: st.error("Erro: Um colaborador com este nome exato já existe.")
+            else: st.warning("O Nome é obrigatório.")
     st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ==========================================
-# TELA 3: IMPORTAÇÃO E MERGE DE PLANILHAS
+# TELA 4: IMPORTAÇÃO DE PLANILHAS
 # ==========================================
 elif menu_selecionado == "Integração de Dados (Planilhas)":
     st.markdown('<div class="css-card">', unsafe_allow_html=True)
-    st.subheader("🔗 Importar e Consolidar Bases Externas")
-    st.write("Faça o upload de planilhas. O sistema irá cruzá-las usando uma chave (ex: cpf) e permitirá a inserção em massa no banco de dados.")
+    st.subheader("🔗 Importação em Massa")
+    st.write("A planilha deve conter obrigatoriamente as colunas: **nome**, **genero**, **local**, **setor** e **status** (Ativo/Afastado/Inativo).")
     
-    arquivos = st.file_uploader("Selecione os arquivos (Excel ou CSV)", accept_multiple_files=True, type=['xlsx', 'csv'])
-    
-    if arquivos and len(arquivos) >= 2:
-        lista_dfs = []
-        for arq in arquivos:
-            try:
-                if arq.name.endswith('.csv'): lista_dfs.append(pd.read_csv(arq))
-                else: lista_dfs.append(pd.read_excel(arq))
-            except Exception as e: st.error(f"Erro ao ler {arq.name}: {e}")
-                
-        st.success(f"{len(arquivos)} planilhas processadas na memória.")
-        for idx in range(len(lista_dfs)): lista_dfs[idx].columns = lista_dfs[idx].columns.str.lower().str.strip()
-            
-        colunas_disponiveis = lista_dfs[0].columns.tolist()
-        chave_cruzamento = st.selectbox("Selecione a Coluna Chave para fundir os dados (ex: cpf, id):", colunas_disponiveis)
-        
-        if st.button("Comparar e Cruzar Dados", type="primary"):
-            try:
-                df_final = lista_dfs[0]
-                for i in range(1, len(lista_dfs)):
-                    df_final = pd.merge(df_final, lista_dfs[i], on=chave_cruzamento, how='outer', suffixes=('', f'_arq{i}'))
-                st.session_state['df_cruzado'] = df_final
-                st.success("Cruzamento realizado! Visualize abaixo:")
-            except Exception as e:
-                st.error(f"A coluna '{chave_cruzamento}' não foi encontrada em todas as planilhas.")
-                
-        if 'df_cruzado' in st.session_state:
-            df_final_viz = st.session_state['df_cruzado']
-            st.dataframe(aplicar_lgpd(df_final_viz, usuario_logado['perfil']), use_container_width=True)
-            st.markdown("---")
-            st.write("### 📤 Salvar no Banco de Dados Central")
-            st.info("Atenção: A planilha final precisa ter obrigatoriamente as colunas **nome** e **cpf** para a inserção funcionar. Registros com CPFs já existentes no banco serão ignorados.")
-            if st.button("Gravar Registros em Massa no Banco", type="primary", use_container_width=True):
-                qtd_inseridos = db.importar_massa(df_final_viz, usuario_logado['nome'])
-                if qtd_inseridos > 0:
-                    st.success(f"Sucesso! {qtd_inseridos} novos colaboradores foram inseridos na base.")
-                    del st.session_state['df_cruzado']
-                else:
-                    st.warning("Nenhum registro novo foi inserido. Verifique as colunas 'nome' e 'cpf'.")
-                    
-    elif arquivos:
-        st.warning("Por favor, suba pelo menos 2 arquivos para fazer o cruzamento.")
+    arquivo = st.file_uploader("Selecione a planilha (Excel ou CSV)", type=['xlsx', 'csv'])
+    if arquivo:
+        try:
+            if arquivo.name.endswith('.csv'): df_import = pd.read_csv(arquivo)
+            else: df_import = pd.read_excel(arquivo)
+            df_import.columns = df_import.columns.str.lower().str.strip()
+            st.success("Planilha lida com sucesso! Visualize a prévia:")
+            st.dataframe(df_import.head())
+            if st.button("Gravar Dados no Sistema", type="primary", use_container_width=True):
+                qtd = db.importar_massa(df_import, usuario_logado['nome'])
+                if qtd > 0: st.success(f"{qtd} registros processados/atualizados com sucesso!")
+                else: st.warning("Nenhum dado importado. Verifique o nome exato das colunas.")
+        except Exception as e: st.error(f"Erro ao ler arquivo: {e}")
     st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ==========================================
-# TELA 4: AUDITORIA E LOGS (Somente Admin)
+# TELA 5: AUDITORIA E LOGS (Somente Admin)
 # ==========================================
 elif menu_selecionado == "Auditoria e Logs 🔐":
     st.markdown('<div class="css-card">', unsafe_allow_html=True)
     st.subheader("Histórico de Acessos e Alterações")
-    st.write("Abaixo está o registro imutável de todas as ações realizadas na plataforma.")
-    
     df_logs = db.ler_logs()
-    
-    busca = st.text_input("🔍 Buscar no log (por Usuário ou Ação):")
-    if busca:
-        df_logs = df_logs[df_logs['usuario'].str.contains(busca, case=False, na=False) | df_logs['acao'].str.contains(busca, case=False, na=False)]
-        
+    busca = st.text_input("🔍 Buscar no log:")
+    if busca: df_logs = df_logs[df_logs['usuario'].str.contains(busca, case=False, na=False) | df_logs['acao'].str.contains(busca, case=False, na=False)]
     st.dataframe(df_logs, use_container_width=True, hide_index=True)
-    st.caption("Os logs de sistema não podem ser apagados ou editados manualmente, garantindo a conformidade com a LGPD.")
     st.markdown('</div>', unsafe_allow_html=True)
