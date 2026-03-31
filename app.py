@@ -105,7 +105,6 @@ class DatabaseManager:
 
     def _inicializar_tabelas(self):
         with self.engine.connect() as conn:
-            # Tabela Colaboradores
             conn.execute(text('''
                 CREATE TABLE IF NOT EXISTS colab_v3 (
                     id SERIAL PRIMARY KEY,
@@ -118,7 +117,6 @@ class DatabaseManager:
                     status VARCHAR(20) DEFAULT 'Ativo'
                 )
             '''))
-            # Tabela Auditoria
             conn.execute(text('''
                 CREATE TABLE IF NOT EXISTS auditoria_logs (
                     id SERIAL PRIMARY KEY,
@@ -128,7 +126,6 @@ class DatabaseManager:
                     detalhes TEXT
                 )
             '''))
-            # Tabela Usuários
             conn.execute(text('''
                 CREATE TABLE IF NOT EXISTS users_v3 (
                     id SERIAL PRIMARY KEY,
@@ -139,7 +136,6 @@ class DatabaseManager:
                     primeiro_acesso BOOLEAN DEFAULT TRUE
                 )
             '''))
-            # Tabela Metas de Vagas
             conn.execute(text('''
                 CREATE TABLE IF NOT EXISTS metas_vagas (
                     id SERIAL PRIMARY KEY,
@@ -150,14 +146,12 @@ class DatabaseManager:
                 )
             '''))
             
-            # Cria admin padrão se vazio
             if conn.execute(text("SELECT COUNT(*) FROM users_v3")).scalar() == 0:
                 conn.execute(text('''
                     INSERT INTO users_v3 (username, senha, perfil, nome, primeiro_acesso) VALUES 
                     ('bruno.admin', '123', 'Admin', 'Bruno Silva', FALSE)
                 '''))
                 
-            # Popula as metas iniciais se a tabela estiver vazia
             if conn.execute(text("SELECT COUNT(*) FROM metas_vagas")).scalar() == 0:
                 for loc, setores in DEFAULT_ALVOS.items():
                     for setr, meta in setores.items():
@@ -318,7 +312,6 @@ if not st.session_state.get('logado'):
 # ==========================================
 # VERIFICAÇÃO DE PRIMEIRO ACESSO (CORRIGIDA)
 # ==========================================
-# Verifica de forma segura usando .get() para evitar KeyError
 if st.session_state.get('logado', False) and st.session_state.get('usuario_atual'):
     if st.session_state['usuario_atual'].get('primeiro_acesso', False):
         st.markdown("<br><br>", unsafe_allow_html=True)
@@ -542,13 +535,13 @@ if menu_selecionado == "Home - Dashboard":
             st.markdown(f'<div class="dept-item"><span class="dept-name">Multirão Garantia</span><span class="dept-num" style="color:#7DD3FC;">{count_setor_todos("PF", "Multirão Garantia")}</span></div>', unsafe_allow_html=True)
             st.markdown(f'<div class="dept-item"><span class="dept-name">Jurimetria</span><span class="dept-num" style="color:#7DD3FC;">{count_setor_todos("PF", "Jurimetria")}</span></div>', unsafe_allow_html=True)
 
+
     # --- CÁLCULO DINÂMICO DE VAGAS ABERTAS (Lendo as Metas do BD) ---
     st.markdown('<hr style="margin:2rem 0;">', unsafe_allow_html=True)
     v1, v2 = st.columns([1, 2])
     with v1: st.markdown('<div class="section-title" style="margin-top:0;">Vagas Abertas</div>', unsafe_allow_html=True)
     with v2: filtro_vaga = st.radio("Filtro", ["Tudo", "PJ", "SEDE", "PF", "PPD"], horizontal=True, label_visibility="collapsed")
     
-    # Processa as Vagas Dinâmicas
     df_metas_banco = db.ler_metas()
     lista_vagas_abertas = []
     
