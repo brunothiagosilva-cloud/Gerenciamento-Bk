@@ -69,6 +69,31 @@ ESTRUTURA = {
     "PPD": ["Equipe Geral"]
 }
 
+
+# ==========================================
+# FUNÇÕES UTILITÁRIAS E LGPD
+# ==========================================
+def aplicar_lgpd(df: pd.DataFrame, perfil_usuario: str) -> pd.DataFrame:
+    if perfil_usuario == 'Admin' or df.empty: 
+        return df
+    df_mascarado = df.copy()
+    def mascarar_email(email):
+        email = str(email)
+        return f"{email[0]}***@{email.split('@')[-1]}" if '@' in email else ""
+    if 'email' in df_mascarado.columns: 
+        df_mascarado['email'] = df_mascarado['email'].apply(mascarar_email)
+    return df_mascarado
+
+def render_status_badge(status):
+    status_up = str(status).upper()
+    if "ATIVO" in status_up: 
+        return f'<span class="badge-status bg-active">{status}</span>'
+    elif "PRÉVIA" in status_up or "SHORTLISTING" in status_up: 
+        return f'<span class="badge-status bg-short">{status}</span>'
+    else: 
+        return f'<span class="badge-status bg-urgent">{status}</span>'
+
+
 # ==========================================
 # BANCO DE DADOS E AUDITORIA
 # ==========================================
@@ -157,7 +182,8 @@ class DatabaseManager:
         with self.engine.connect() as conn:
             result = conn.execute(text("SELECT username, senha, perfil, nome, primeiro_acesso FROM users_v3 WHERE username = :usr AND senha = :pwd"), 
                                   {"usr": username, "pwd": senha}).fetchone()
-            if result: return {"username": result[0], "senha": result[1], "perfil": result[2], "nome": result[3], "primeiro_acesso": result[4]}
+            if result: 
+                return {"username": result[0], "senha": result[1], "perfil": result[2], "nome": result[3], "primeiro_acesso": result[4]}
             return None
 
     def criar_usuario(self, username, senha, perfil, nome):
@@ -247,31 +273,17 @@ class DatabaseManager:
                         registros_inseridos += 1
                     except: pass 
             conn.commit()
-        if registros_inseridos > 0: self.registrar_log(usuario, "Importação em Massa", f"Processados {registros_inseridos} colaboradores.")
+        if registros_inseridos > 0: 
+            self.registrar_log(usuario, "Importação em Massa", f"Processados {registros_inseridos} colaboradores.")
         return registros_inseridos
 
 @st.cache_resource
 def iniciar_conexao_banco():
     return DatabaseManager()
 
-def aplicar_lgpd(df: pd.DataFrame, perfil_usuario: str) -> pd.DataFrame:
-    if perfil_usuario == 'Admin' or df.empty: return df
-    df_mascarado = df.copy()
-    def mascarar_email(email):
-        email = str(email)
-        return f"{email[0]}***@{email.split('@')[-1]}" if '@' in email else ""
-    if 'email' in df_mascarado.columns: df_mascarado['email'] = df_mascarado['email'].apply(mascarar_email)
-    return df_mascarado
-
-def render_status_badge(status):
-    status_up = str(status).upper()
-    if "ATIVO" in status_up: return f'<span class="badge-status bg-active">{status}</span>'
-    elif "PRÉVIA" in status_up or "SHORTLISTING" in status_up: return f'<span class="badge-status bg-short">{status}</span>'
-    else: return f'<span class="badge-status bg-urgent">{status}</span>'
-
 
 # ==========================================
-# SISTEMA DE LOGIN E TROCA DE SENHA
+# SISTEMA DE LOGIN E SESSÃO
 # ==========================================
 db = iniciar_conexao_banco()
 
@@ -295,31 +307,41 @@ def tela_login():
                 st.error("Credenciais inválidas.")
         st.markdown('</div>', unsafe_allow_html=True)
 
-if 'logado' not in st.session_state: st.session_state['logado'] = False
-if not st.session_state['logado']:
+if 'logado' not in st.session_state: 
+    st.session_state['logado'] = False
+    
+if not st.session_state.get('logado'):
     tela_login()
     st.stop()
 
-# VERIFICAÇÃO DE PRIMEIRO ACESSO
-if st.session_state['usuario_atual']['primeiro_acesso']:
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1, 1.5, 1])
-    with c2:
-        st.markdown('<div class="css-card" style="border-top: 5px solid #005F60;">', unsafe_allow_html=True)
-        st.subheader("⚠️ Troca de Senha Obrigatória")
-        st.write("Bem-vindo(a)! Como este é o seu primeiro acesso, crie uma senha pessoal e segura.")
-        nova_senha = st.text_input("Nova Senha", type="password")
-        confirma_senha = st.text_input("Confirme a Senha", type="password")
-        if st.button("Salvar e Acessar o Sistema", type="primary", use_container_width=True):
-            if len(nova_senha) < 4: st.error("A senha deve ter pelo menos 4 caracteres.")
-            elif nova_senha != confirma_senha: st.error("As senhas não coincidem.")
-            else:
-                db.atualizar_senha(st.session_state['usuario_atual']['username'], nova_senha)
-                st.session_state['usuario_atual']['primeiro_acesso'] = False
-                st.success("Senha atualizada! Redirecionando...")
-                st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-    st.stop()
+
+# ==========================================
+# VERIFICAÇÃO DE PRIMEIRO ACESSO (CORRIGIDA)
+# ==========================================
+# Verifica de forma segura usando .get() para evitar KeyError
+if st.session_state.get('logado', False) and st.session_state.get('usuario_atual'):
+    if st.session_state['usuario_atual'].get('primeiro_acesso', False):
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        c1, c2, c3 = st.columns([1, 1.5, 1])
+        with c2:
+            st.markdown('<div class="css-card" style="border-top: 5px solid #005F60;">', unsafe_allow_html=True)
+            st.subheader("⚠️ Troca de Senha Obrigatória")
+            st.write("Bem-vindo(a)! Como este é o seu primeiro acesso, crie uma senha pessoal e segura.")
+            nova_senha = st.text_input("Nova Senha", type="password")
+            confirma_senha = st.text_input("Confirme a Senha", type="password")
+            
+            if st.button("Salvar e Acessar o Sistema", type="primary", use_container_width=True):
+                if len(nova_senha) < 4: 
+                    st.error("A senha deve ter pelo menos 4 caracteres.")
+                elif nova_senha != confirma_senha: 
+                    st.error("As senhas não coincidem.")
+                else:
+                    db.atualizar_senha(st.session_state['usuario_atual']['username'], nova_senha)
+                    st.session_state['usuario_atual']['primeiro_acesso'] = False
+                    st.success("Senha atualizada! Redirecionando...")
+                    st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+        st.stop()
 
 
 # ==========================================
@@ -345,6 +367,7 @@ def count_setor_todos(local, setor):
     return len(df_colab[(df_colab['local'] == local) & (df_colab['setor'] == setor)])
 
 df_exibicao_segura = aplicar_lgpd(df_colab, usuario_logado['perfil'])
+
 
 # --- SIDEBAR (Menu Lateral) ---
 with st.sidebar:
@@ -375,8 +398,10 @@ with st.sidebar:
                             if db.criar_usuario(novo_usr, nova_senha, novo_perfil, novo_nome):
                                 db.registrar_log(usuario_logado['nome'], "Criação de Usuário", f"Criou o login '{novo_usr}'")
                                 st.success("Usuário criado!")
-                            else: st.error("Erro: Login já existe.")
-                        else: st.warning("Preencha tudo.")
+                            else: 
+                                st.error("Erro: Login já existe.")
+                        else: 
+                            st.warning("Preencha tudo.")
             
             with tab_list:
                 df_users = db.listar_usuarios()
@@ -449,7 +474,8 @@ if menu_selecionado == "Home - Dashboard":
                             db.atualizar_colaborador(row['id'], row['nome'], row['genero'], row['local'], row['setor'], row['status'], row.get('email', ''), row.get('raca', ''))
                         st.success("Dados atualizados com sucesso!")
                         st.rerun()
-                    except Exception as e: st.error(f"Erro ao salvar: {e}")
+                    except Exception as e: 
+                        st.error(f"Erro ao salvar: {e}")
         else:
             st.dataframe(df_view, use_container_width=True, hide_index=True)
             
@@ -554,7 +580,7 @@ if menu_selecionado == "Home - Dashboard":
     df_vagas_filtrado = df_vagas_dinamico if (filtro_vaga == "Tudo" or df_vagas_dinamico.empty) else df_vagas_dinamico[df_vagas_dinamico['Filtro'] == filtro_vaga]
     
     if df_vagas_filtrado.empty:
-        st.markdown("<p style='text-align:center; padding: 2rem; color: gray;'>Quadro 100% completo! Nenhuma vaga aberta no momento.</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center; padding: 2rem; color: gray;'>Quadro completo! Nenhuma vaga aberta no momento.</p>", unsafe_allow_html=True)
     else:
         for _, row in df_vagas_filtrado.iterrows():
             cols = st.columns([2, 3, 1, 2])
@@ -614,8 +640,10 @@ elif menu_selecionado == "Gestão de Pessoas":
                 if db.adicionar_colaborador(dados_novos, usuario_logado['nome']):
                     st.success(f"Cadastro de {nome} realizado com sucesso!")
                     st.rerun()
-                else: st.error("Erro: Um colaborador com este nome exato já existe.")
-            else: st.warning("O Nome é obrigatório.")
+                else: 
+                    st.error("Erro: Um colaborador com este nome exato já existe.")
+            else: 
+                st.warning("O Nome é obrigatório.")
     st.markdown('</div>', unsafe_allow_html=True)
 
 
@@ -637,9 +665,12 @@ elif menu_selecionado == "Integração de Dados (Planilhas)":
             st.dataframe(df_import.head())
             if st.button("Gravar Dados no Sistema", type="primary", use_container_width=True):
                 qtd = db.importar_massa(df_import, usuario_logado['nome'])
-                if qtd > 0: st.success(f"{qtd} registros processados/atualizados com sucesso!")
-                else: st.warning("Nenhum dado importado. Verifique o nome exato das colunas.")
-        except Exception as e: st.error(f"Erro ao ler arquivo: {e}")
+                if qtd > 0: 
+                    st.success(f"{qtd} registros processados/atualizados com sucesso!")
+                else: 
+                    st.warning("Nenhum dado importado. Verifique o nome exato das colunas.")
+        except Exception as e: 
+            st.error(f"Erro ao ler arquivo: {e}")
     st.markdown('</div>', unsafe_allow_html=True)
 
 
@@ -651,6 +682,7 @@ elif menu_selecionado == "Auditoria e Logs 🔐":
     st.subheader("Histórico de Acessos e Alterações")
     df_logs = db.ler_logs()
     busca = st.text_input("🔍 Buscar no log:")
-    if busca: df_logs = df_logs[df_logs['usuario'].str.contains(busca, case=False, na=False) | df_logs['acao'].str.contains(busca, case=False, na=False)]
+    if busca: 
+        df_logs = df_logs[df_logs['usuario'].str.contains(busca, case=False, na=False) | df_logs['acao'].str.contains(busca, case=False, na=False)]
     st.dataframe(df_logs, use_container_width=True, hide_index=True)
     st.markdown('</div>', unsafe_allow_html=True)
