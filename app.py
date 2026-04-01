@@ -13,42 +13,63 @@ except:
     pass
 
 # ==========================================
-# CONFIGURAÇÃO DA PÁGINA E CSS CUSTOMIZADO
+# CONFIGURAÇÃO E MOTOR DE TEMAS (CSS)
 # ==========================================
 st.set_page_config(page_title="Gerenciamento BK", page_icon="🏢", layout="wide", initial_sidebar_state="expanded")
 
-st.markdown("""
+# Define a cor padrão caso o usuário ainda não tenha escolhido
+if 'cor_tema' not in st.session_state:
+    st.session_state['cor_tema'] = '#005F60'
+
+cor_tema = st.session_state['cor_tema']
+
+# Injeção de CSS Dinâmico (Adaptável à cor do tema)
+st.markdown(f"""
     <style>
-    .stApp { background-color: #F4F7F6; }
-    .kpi-main-card { background-color: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); display: flex; flex-direction: column; position: relative; overflow: hidden;}
-    .kpi-main-title { color: #6B7280; font-size: 0.85rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.5rem; }
-    .kpi-main-value { color: #005F60; font-size: 3.5rem; font-weight: 800; line-height: 1; margin: 0; }
+    .stApp {{ background-color: #F4F7F6; }}
     
-    .kpi-sub-card { background-color: white; padding: 1.2rem; border-radius: 6px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03); margin-bottom: 1rem; }
-    .border-pj { border-left: 4px solid #005F60; }
-    .border-sede { border-left: 4px solid #6B7280; }
-    .border-pf { border-left: 4px solid #7DD3FC; }
-    .border-ppd { border-left: 4px solid #8B4513; }
-    .kpi-sub-title { color: #6B7280; font-size: 0.9rem; font-weight: 800; margin-bottom: 0.2rem; }
-    .kpi-sub-value { color: #111827; font-size: 1.8rem; font-weight: 700; margin: 0; }
+    /* Cartões de KPI */
+    .kpi-main-card {{ background-color: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); display: flex; flex-direction: column; position: relative; overflow: hidden; border-bottom: 3px solid transparent; transition: 0.3s; }}
+    .kpi-main-card:hover {{ border-bottom: 3px solid {cor_tema}; transform: translateY(-2px); }}
+    .kpi-main-title {{ color: #6B7280; font-size: 0.85rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.5rem; }}
+    .kpi-main-value {{ color: {cor_tema}; font-size: 3.5rem; font-weight: 800; line-height: 1; margin: 0; }}
     
-    .dept-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #E5E7EB; padding-bottom: 0.5rem; margin-bottom: 1rem; }
-    .dept-title { font-weight: 700; color: #374151; font-size: 1rem; display: flex; align-items: center; gap: 0.5rem;}
-    .dot-pj { height: 8px; width: 8px; background-color: #005F60; border-radius: 50%; display: inline-block; }
-    .dot-sede { height: 8px; width: 8px; background-color: #6B7280; border-radius: 50%; display: inline-block; }
-    .dot-pf { height: 8px; width: 8px; background-color: #7DD3FC; border-radius: 50%; display: inline-block; }
-    .dept-total-badge { background-color: #F3F4F6; color: #374151; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;}
-    .dept-item { background-color: white; border: 1px solid #F3F4F6; padding: 0.8rem; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; box-shadow: 0 1px 2px rgba(0,0,0,0.02);}
-    .dept-name { font-size: 0.85rem; color: #4B5563; font-weight: 600; text-transform: uppercase;}
-    .dept-num { font-size: 0.9rem; color: #005F60; font-weight: 700; }
+    .kpi-sub-card {{ background-color: white; padding: 1.2rem; border-radius: 6px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03); margin-bottom: 1rem; transition: 0.2s; }}
+    .kpi-sub-card:hover {{ box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); }}
+    .border-pj {{ border-left: 4px solid {cor_tema}; }}
+    .border-sede {{ border-left: 4px solid #6B7280; }}
+    .border-pf {{ border-left: 4px solid #7DD3FC; }}
+    .border-ppd {{ border-left: 4px solid #8B4513; }}
+    .kpi-sub-title {{ color: #6B7280; font-size: 0.9rem; font-weight: 800; margin-bottom: 0.2rem; }}
+    .kpi-sub-value {{ color: #111827; font-size: 1.8rem; font-weight: 700; margin: 0; }}
     
-    .section-title { font-size: 1.25rem; font-weight: 700; color: #111827; margin-top: 2rem; margin-bottom: 1rem; }
-    .badge-status { padding: 4px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
-    .bg-active { background-color: #D1FAE5; color: #065F46; }
-    .bg-short { background-color: #DBEAFE; color: #1E40AF; }
-    .bg-urgent { background-color: #FFEDD5; color: #9A3412; }
+    /* Distribuição Departamental */
+    .dept-header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #E5E7EB; padding-bottom: 0.5rem; margin-bottom: 1rem; }}
+    .dept-title {{ font-weight: 700; color: #374151; font-size: 1rem; display: flex; align-items: center; gap: 0.5rem; }}
+    .dot-pj {{ height: 8px; width: 8px; background-color: {cor_tema}; border-radius: 50%; display: inline-block; }}
+    .dot-sede {{ height: 8px; width: 8px; background-color: #6B7280; border-radius: 50%; display: inline-block; }}
+    .dot-pf {{ height: 8px; width: 8px; background-color: #7DD3FC; border-radius: 50%; display: inline-block; }}
+    .dept-total-badge {{ background-color: #F3F4F6; color: #374151; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }}
+    .dept-item {{ background-color: white; border: 1px solid #F3F4F6; padding: 0.8rem; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }}
+    .dept-name {{ font-size: 0.85rem; color: #4B5563; font-weight: 600; text-transform: uppercase; }}
+    .dept-num {{ font-size: 0.9rem; color: {cor_tema}; font-weight: 700; }}
     
-    #MainMenu {visibility: hidden;} footer {visibility: hidden;}
+    /* Perfil Sidebar */
+    .sidebar-profile {{ background-color: {cor_tema}10; border-left: 4px solid {cor_tema}; padding: 1rem; border-radius: 4px; margin-bottom: 1.5rem; }}
+    .sidebar-profile-name {{ font-weight: 800; font-size: 1.1rem; color: #111827; margin: 0; }}
+    .sidebar-profile-role {{ font-size: 0.8rem; color: {cor_tema}; font-weight: 600; margin: 0; text-transform: uppercase; }}
+    
+    /* Utilitários */
+    .section-title {{ font-size: 1.25rem; font-weight: 700; color: #111827; margin-top: 2rem; margin-bottom: 1rem; }}
+    .badge-status {{ padding: 4px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }}
+    .bg-active {{ background-color: #D1FAE5; color: #065F46; border: 1px solid #A7F3D0; }}
+    .bg-short {{ background-color: #DBEAFE; color: #1E40AF; border: 1px solid #BFDBFE; }}
+    .bg-urgent {{ background-color: #FFEDD5; color: #9A3412; border: 1px solid #FED7AA; }}
+    
+    /* Cartões de Usuários na Gestão (Sidebar) */
+    .user-mgt-card {{ background-color: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 6px; padding: 0.8rem; margin-bottom: 0.5rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }}
+    
+    #MainMenu {{visibility: hidden;}} footer {{visibility: hidden;}}
     </style>
 """, unsafe_allow_html=True)
 
@@ -277,7 +298,7 @@ if st.session_state.get('logado', False) and st.session_state.get('usuario_atual
         st.markdown("<br><br>", unsafe_allow_html=True)
         c1, c2, c3 = st.columns([1, 1.5, 1])
         with c2:
-            st.markdown('<div class="css-card" style="border-top: 5px solid #005F60;">', unsafe_allow_html=True)
+            st.markdown(f'<div class="css-card" style="border-top: 5px solid {cor_tema};">', unsafe_allow_html=True)
             st.subheader("⚠️ Troca de Senha Obrigatória")
             st.write(f"Bem-vindo(a) **{st.session_state['usuario_atual']['nome']}**! Como este é o seu primeiro acesso (ou sua senha foi resetada), crie uma nova senha.")
             nova_senha = st.text_input("Nova Senha", type="password")
@@ -321,64 +342,95 @@ def count_setor_todos(local, setor):
 df_exibicao_segura = aplicar_lgpd(df_colab, usuario_logado['perfil'])
 
 
-# --- SIDEBAR (Menu Lateral) ---
+# ==========================================
+# SIDEBAR REFORMULADA (Visual Moderno)
+# ==========================================
 with st.sidebar:
     st.markdown("### 🏢 GERENCIAMENTO BK")
-    st.markdown(f"👤 **{usuario_logado['nome']}**")
-    st.caption(f"🛡️ Nível de Acesso: **{usuario_logado['perfil']}**")
+    
+    # Cartão de Perfil Estilizado
+    st.markdown(f"""
+        <div class="sidebar-profile">
+            <p class="sidebar-profile-name">{usuario_logado['nome']}</p>
+            <p class="sidebar-profile-role">🛡️ Nível: {usuario_logado['perfil']}</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
     st.markdown("---")
     
+    # Navegação
     opcoes_menu = ["Home - Dashboard", "Gestão de Pessoas", "Integração de Dados (Planilhas)"]
     if usuario_logado['perfil'] == 'Admin':
         opcoes_menu.append("Configurações ⚙️")
         opcoes_menu.append("Auditoria e Logs 🔐")
         
-    menu_selecionado = st.radio("Navegação", opcoes_menu)
+    menu_selecionado = st.radio("NAVEGAÇÃO", opcoes_menu)
+    st.markdown("---")
     
+    # --- ÁREA DE ADMIN: GESTÃO DE USUÁRIOS E TEMA ---
     if usuario_logado['perfil'] == 'Admin':
-        st.markdown("---")
-        with st.expander("⚙️ Gestão de Usuários (Acessos)"):
-            tab_add, tab_list = st.tabs(["➕ Criar", "📋 Editar/Excluir"])
-            with tab_add:
-                with st.form("form_novo_user"):
+        
+        # 1. Configuração de Tema (Nova)
+        with st.expander("🎨 Aparência do Sistema", expanded=False):
+            st.caption("Escolha a cor primária do painel:")
+            novo_tema = st.color_picker("Cor do Tema", st.session_state['cor_tema'])
+            if novo_tema != st.session_state['cor_tema']:
+                st.session_state['cor_tema'] = novo_tema
+                st.rerun()
+
+        # 2. Gestão de Usuários (Visual Moderno em Cards)
+        with st.expander("👥 Gestão de Acessos", expanded=False):
+            acao_acesso = st.radio("Ação", ["Adicionar Novo", "Lista e Edição"], horizontal=True, label_visibility="collapsed")
+            
+            if acao_acesso == "Adicionar Novo":
+                with st.form("form_novo_user_clean"):
+                    st.caption("Preencha os dados do novo acesso:")
                     novo_nome = st.text_input("Nome Completo")
                     novo_usr = st.text_input("Login").lower()
-                    nova_senha = st.text_input("Senha Provisória", type="password")
+                    nova_senha = st.text_input("Senha Provisória", type="password", value="123")
                     novo_perfil = st.selectbox("Perfil", ["Usuario", "Admin"])
                     if st.form_submit_button("Salvar Usuário", use_container_width=True):
                         if novo_nome and novo_usr and nova_senha:
                             if db.criar_usuario(novo_usr, nova_senha, novo_perfil, novo_nome):
                                 db.registrar_log(usuario_logado['nome'], "Criação de Usuário", f"Criou o login '{novo_usr}'")
-                                st.success("Usuário criado com sucesso!")
+                                st.success("Sucesso!")
                             else: st.error("Erro: Login já existe.")
-                        else: st.warning("Preencha todos os campos.")
+                        else: st.warning("Preencha todos.")
             
-            with tab_list:
+            else:
+                st.caption("Usuários Cadastrados:")
                 df_users = db.listar_usuarios()
                 for _, u in df_users.iterrows():
-                    with st.expander(f"{u['nome']} ({u['perfil']})"):
-                        e_nome = st.text_input("Nome", value=u['nome'], key=f"e_n_{u['id']}")
-                        e_perf = st.selectbox("Perfil", ["Usuario", "Admin"], index=0 if u['perfil']=='Usuario' else 1, key=f"e_p_{u['id']}")
-                        colA, colB, colC = st.columns([1, 1, 1])
-                        with colA:
-                            if st.button("💾", key=f"sv_{u['id']}", help="Salvar nome/perfil"):
+                    st.markdown(f"<div class='user-mgt-card'>", unsafe_allow_html=True)
+                    st.markdown(f"**{u['nome']}**<br><small style='color: gray;'>Login: {u['username']} | Nível: {u['perfil']}</small>", unsafe_allow_html=True)
+                    
+                    # Controles Compactos
+                    c_edit, c_del = st.columns([2, 1])
+                    with c_edit:
+                        with st.popover("Editar / Reset"):
+                            st.write("Atualizar Dados:")
+                            e_nome = st.text_input("Nome", value=u['nome'], key=f"e_n_{u['id']}")
+                            e_perf = st.selectbox("Perfil", ["Usuario", "Admin"], index=0 if u['perfil']=='Usuario' else 1, key=f"e_p_{u['id']}")
+                            if st.button("💾 Salvar Perfil", key=f"sv_{u['id']}", use_container_width=True):
                                 db.atualizar_usuario_info(u['id'], e_nome, e_perf)
-                                st.success("OK")
+                                st.success("Salvo!")
                                 st.rerun()
-                        with colB:
-                            if st.button("🔑", key=f"rs_{u['id']}", help="Reseta a senha para 123"):
+                            st.divider()
+                            st.write("Segurança:")
+                            if st.button("🔑 Resetar Senha (123)", key=f"rs_{u['id']}", use_container_width=True):
                                 db.resetar_senha(u['username'])
-                                db.registrar_log(usuario_logado['nome'], "Reset de Senha", f"Senha de '{u['username']}' resetada.")
-                                st.success("Reset OK!")
-                        with colC:
-                            if u['username'] != 'bruno.admin': 
-                                if st.button("🗑️", key=f"del_{u['id']}", help="Excluir Usuário"):
-                                    db.excluir_usuario(u['username'])
-                                    db.registrar_log(usuario_logado['nome'], "Exclusão", f"Excluiu '{u['username']}'")
-                                    st.rerun()
+                                db.registrar_log(usuario_logado['nome'], "Reset", f"Senha de '{u['username']}' resetada.")
+                                st.success("Resetado!")
+                    with c_del:
+                        if u['username'] != 'bruno.admin': 
+                            if st.button("🗑️", key=f"del_{u['id']}", help="Excluir Permanentemente"):
+                                db.excluir_usuario(u['username'])
+                                db.registrar_log(usuario_logado['nome'], "Exclusão", f"Excluiu '{u['username']}'")
+                                st.rerun()
+                    st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("<br><br>", unsafe_allow_html=True)
-    if st.button("🚪 Sair", use_container_width=True):
+    if st.button("🚪 Sair com Segurança", use_container_width=True):
         db.registrar_log(usuario_logado['nome'], "Logout do Sistema")
         st.session_state['logado'] = False
         st.rerun()
@@ -389,10 +441,10 @@ with col_titulo:
     st.title(menu_selecionado.split(" - ")[0])
 with col_busca:
     st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-    termo_busca = st.text_input("🔍 Pesquisa Inteligente", placeholder="Pesquisar talento, setor, departamento...", label_visibility="collapsed")
+    termo_busca = st.text_input("🔍 Pesquisa Inteligente Global", placeholder="Pesquisar talento, setor, departamento...", label_visibility="collapsed")
 with col_btn:
     st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-    if st.button("🔄 Atualizar Dados", use_container_width=True):
+    if st.button("🔄 Atualizar Base", use_container_width=True):
         st.rerun()
 
 
@@ -414,8 +466,8 @@ if menu_selecionado == "Home - Dashboard":
     with h4: st.markdown(f'<div class="kpi-sub-card border-ppd"><div class="kpi-sub-title">PPD</div><div class="kpi-sub-value">{ppd_count}</div></div>', unsafe_allow_html=True)
 
     # --- EDIÇÃO DIRETA NAS LISTAS E EXPORTAÇÃO (Com Filtro de Busca Integrado) ---
-    with st.expander("📊 Clique aqui para Listar/Editar/Exportar dados dos KPIs Acima"):
-        filtro_relatorio = st.radio("Filtro Categoria:", ["Listar Ativos", "Listar Inativos", "Listar Afastados", "Listar PJ", "Listar SEDE", "Listar PF", "Listar Homens", "Listar Mulheres", "Listar Todos"], horizontal=True)
+    with st.expander("📊 Listagem, Edição e Exportação de Dados"):
+        filtro_relatorio = st.radio("Filtro Rápido:", ["Listar Ativos", "Listar Inativos", "Listar Afastados", "Listar PJ", "Listar SEDE", "Listar PF", "Listar Homens", "Listar Mulheres", "Listar Todos"], horizontal=True)
         
         df_view = df_exibicao_segura.copy()
         if filtro_relatorio == "Listar Ativos": df_view = df_view[df_view['status'].str.lower() == 'ativo']
@@ -432,7 +484,7 @@ if menu_selecionado == "Home - Dashboard":
             df_view = df_view[df_view.apply(lambda row: row.astype(str).str.contains(termo_busca, case=False, na=False).any(), axis=1)]
         
         if usuario_logado['perfil'] == 'Admin' and not df_view.empty:
-            st.caption("Você é Admin. Dê um clique duplo na célula para corrigir dados. Depois clique em 'Salvar'.")
+            st.caption("Você é Admin. Dê um clique duplo na célula para corrigir dados. Depois clique em 'Salvar Alterações'.")
             edited_df = st.data_editor(df_view, use_container_width=True, hide_index=True, disabled=["id", "email"])
             c1, c2 = st.columns([1, 4])
             with c1:
@@ -440,7 +492,7 @@ if menu_selecionado == "Home - Dashboard":
                     try:
                         for _, row in edited_df.iterrows():
                             db.atualizar_colaborador(row['id'], row['nome'], row['genero'], row['local'], row['setor'], row['status'], row.get('email', ''), row.get('raca', ''))
-                        st.success("Atualizado!")
+                        st.success("Base Atualizada!")
                         st.rerun()
                     except Exception as e: st.error(f"Erro: {e}")
         else:
@@ -511,7 +563,7 @@ if menu_selecionado == "Home - Dashboard":
     # --- CÁLCULO DINÂMICO DE VAGAS ABERTAS ---
     st.markdown('<hr style="margin:2rem 0;">', unsafe_allow_html=True)
     v1, v2 = st.columns([1, 2])
-    with v1: st.markdown('<div class="section-title" style="margin-top:0;">Vagas Abertas</div>', unsafe_allow_html=True)
+    with v1: st.markdown('<div class="section-title" style="margin-top:0;">Vagas Abertas / Mapeamento de Oportunidades</div>', unsafe_allow_html=True)
     with v2: filtro_vaga = st.radio("Filtro Vagas", ["Tudo", "PJ", "SEDE", "PF", "PPD"], horizontal=True, label_visibility="collapsed")
     
     df_metas_banco = db.ler_metas()
@@ -548,13 +600,13 @@ if menu_selecionado == "Home - Dashboard":
         df_vagas_filtrado = df_vagas_filtrado[df_vagas_filtrado.apply(lambda row: row.astype(str).str.contains(termo_busca, case=False, na=False).any(), axis=1)]
     
     if df_vagas_filtrado.empty:
-        st.markdown("<p style='text-align:center; padding: 2rem; color: gray;'>Nenhuma vaga aberta encontrada para este filtro/pesquisa.</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center; padding: 2rem; color: gray;'>Quadro de Colaboradores Completo! Nenhuma vaga aberta encontrada.</p>", unsafe_allow_html=True)
     else:
         for _, row in df_vagas_filtrado.iterrows():
             cols = st.columns([2, 3, 1, 2])
             cols[0].markdown(f"**{row['Departamento']}**", unsafe_allow_html=True)
             cols[1].markdown(f"{row['Título da Função']}", unsafe_allow_html=True)
-            cols[2].markdown(f"<span style='font-weight:900; color:#005F60;'>{row['Vagas']}</span>", unsafe_allow_html=True)
+            cols[2].markdown(f"<span style='font-weight:900; color:{cor_tema};'>{row['Vagas']}</span>", unsafe_allow_html=True)
             cols[3].markdown(render_status_badge(row['Status']), unsafe_allow_html=True)
             st.markdown("<hr style='margin: 0.5rem 0; opacity: 0.5;'>", unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
@@ -565,14 +617,14 @@ if menu_selecionado == "Home - Dashboard":
 # ==========================================
 elif menu_selecionado == "Configurações ⚙️":
     st.markdown('<div class="css-card">', unsafe_allow_html=True)
-    st.subheader("⚙️ Configurações de Vagas por Departamento")
-    st.write("Abaixo você pode definir a quantidade alvo (Meta de Vagas) para cada setor. O sistema usará este valor para calcular automaticamente quantas vagas estão abertas.")
+    st.subheader("⚙️ Configurações de Metas (Vagas por Departamento)")
+    st.write("Defina a quantidade alvo (Meta) para cada setor. O sistema usará este valor para calcular automaticamente quantas vagas estão abertas.")
     
     df_metas_atual = db.ler_metas()
     if termo_busca and not df_metas_atual.empty:
         df_metas_atual = df_metas_atual[df_metas_atual.apply(lambda row: row.astype(str).str.contains(termo_busca, case=False, na=False).any(), axis=1)]
         
-    st.caption("Dê um duplo clique na coluna 'meta' para alterar o número de vagas. Os outros campos são bloqueados.")
+    st.caption("Dê um duplo clique na coluna 'meta' para alterar o número de vagas. Clique em Salvar para aplicar.")
     edited_metas = st.data_editor(df_metas_atual, use_container_width=True, hide_index=True, disabled=["local", "setor"])
     
     if st.button("💾 Salvar Novas Metas", type="primary"):
@@ -589,7 +641,7 @@ elif menu_selecionado == "Configurações ⚙️":
 # ==========================================
 elif menu_selecionado == "Gestão de Pessoas":
     st.markdown('<div class="css-card">', unsafe_allow_html=True)
-    st.subheader("➕ Novo Cadastro")
+    st.subheader("➕ Cadastro Manual")
     
     with st.form("form_novo_colab"):
         col1, col2, col3 = st.columns([2, 2, 1])
@@ -614,9 +666,9 @@ elif menu_selecionado == "Gestão de Pessoas":
     
     if termo_busca:
         st.markdown('<div class="css-card">', unsafe_allow_html=True)
-        st.subheader("🔎 Resultado da Pesquisa")
+        st.subheader("🔎 Resultado da Pesquisa Global")
         df_busca = df_exibicao_segura[df_exibicao_segura.apply(lambda row: row.astype(str).str.contains(termo_busca, case=False, na=False).any(), axis=1)]
-        if df_busca.empty: st.warning("Nenhum registro encontrado.")
+        if df_busca.empty: st.warning("Nenhum registro encontrado para esta busca.")
         else: st.dataframe(df_busca, use_container_width=True, hide_index=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -626,8 +678,8 @@ elif menu_selecionado == "Gestão de Pessoas":
 # ==========================================
 elif menu_selecionado == "Integração de Dados (Planilhas)":
     st.markdown('<div class="css-card">', unsafe_allow_html=True)
-    st.subheader("🔗 Importação em Massa")
-    st.write("A planilha deve conter obrigatoriamente as colunas: **nome**, **genero**, **local**, **setor** e **status**.")
+    st.subheader("🔗 Importação em Massa Simplificada")
+    st.write("A planilha deve conter as colunas: **nome**, **genero**, **local**, **setor** e **status**.")
     
     arquivo = st.file_uploader("Selecione a planilha (Excel ou CSV)", type=['xlsx', 'csv'])
     if arquivo:
@@ -637,12 +689,12 @@ elif menu_selecionado == "Integração de Dados (Planilhas)":
             df_import.columns = df_import.columns.str.lower().str.strip()
             df_import.columns = df_import.columns.str.replace(r'[^\w\s]', '', regex=True)
             
-            st.success("Planilha lida com sucesso! Visualize a prévia:")
+            st.success("Planilha lida! O Motor de Importação vai limpar acentos e padronizar Setores automaticamente. Prévia:")
             st.dataframe(df_import.head())
             if st.button("Gravar Dados no Sistema", type="primary", use_container_width=True):
                 qtd = db.importar_massa(df_import, usuario_logado['nome'])
                 if qtd > 0: st.success(f"{qtd} registros processados/atualizados com sucesso!")
-                else: st.warning("Nenhum dado importado. Verifique os nomes das colunas.")
+                else: st.warning("Nenhum dado importado. Verifique os nomes das colunas da planilha.")
         except Exception as e: st.error(f"Erro ao ler arquivo: {e}")
     st.markdown('</div>', unsafe_allow_html=True)
 
