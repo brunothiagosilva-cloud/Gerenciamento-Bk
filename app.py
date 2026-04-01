@@ -75,7 +75,6 @@ def remover_acentos_espacos(txt):
     txt = str(txt).strip().lower()
     return ''.join(c for c in unicodedata.normalize('NFD', txt) if unicodedata.category(c) != 'Mn')
 
-# Dicionário de mapeamento reverso para acertar exatamente o nome do setor do banco de dados
 MAPA_SETORES_NORM = {remover_acentos_espacos(s): s for loc, setores in ESTRUTURA.items() for s in setores}
 
 def padronizar_local(txt_local):
@@ -96,10 +95,6 @@ def padronizar_genero(txt_genero):
     if norm in ['f', 'fem', 'feminino']: return 'Feminino'
     return 'Outro'
 
-
-# ==========================================
-# FUNÇÕES UTILITÁRIAS E LGPD
-# ==========================================
 def aplicar_lgpd(df: pd.DataFrame, perfil_usuario: str) -> pd.DataFrame:
     if perfil_usuario == 'Admin' or df.empty: return df
     df_mascarado = df.copy()
@@ -148,7 +143,7 @@ class DatabaseManager:
             for _, row in df_metas.iterrows():
                 conn.execute(text("UPDATE metas_vagas SET meta = :m WHERE local = :l AND setor = :s"), {"m": row['meta'], "l": row['local'], "s": row['setor']})
             conn.commit()
-        self.registrar_log(usuario, "Atualização de Metas", "Alterou os parâmetros de vagas no painel de configurações.")
+        self.registrar_log(usuario, "Atualização de Metas", "Alterou parâmetros de vagas.")
 
     def autenticar_usuario(self, username, senha):
         with self.engine.connect() as conn:
@@ -206,7 +201,7 @@ class DatabaseManager:
             try:
                 conn.execute(text("INSERT INTO colab_v3 (nome, email, raca, genero, local, setor, status) VALUES (:nome, :email, :raca, :genero, :local, :setor, :status)"), dados)
                 conn.commit()
-                self.registrar_log(usuario, "Cadastro de Colaborador", f"Adicionado: {dados['nome']}")
+                self.registrar_log(usuario, "Cadastro Colaborador", f"Adicionado: {dados['nome']}")
                 return True
             except: return False
                 
@@ -241,8 +236,7 @@ class DatabaseManager:
                         registros_inseridos += 1
                     except Exception as e: pass 
             conn.commit()
-        if registros_inseridos > 0: 
-            self.registrar_log(usuario, "Importação em Massa", f"Processados {registros_inseridos} colaboradores.")
+        if registros_inseridos > 0: self.registrar_log(usuario, "Importação em Massa", f"Processados {registros_inseridos} colaboradores.")
         return registros_inseridos
 
 @st.cache_resource
@@ -270,8 +264,7 @@ def tela_login():
                 st.session_state['usuario_atual'] = user_auth
                 db.registrar_log(user_auth["nome"], "Login no Sistema")
                 st.rerun()
-            else:
-                st.error("Credenciais inválidas.")
+            else: st.error("Credenciais inválidas.")
         st.markdown('</div>', unsafe_allow_html=True)
 
 if 'logado' not in st.session_state: st.session_state['logado'] = False
@@ -279,7 +272,6 @@ if not st.session_state.get('logado'):
     tela_login()
     st.stop()
 
-# VERIFICAÇÃO DE PRIMEIRO ACESSO
 if st.session_state.get('logado', False) and st.session_state.get('usuario_atual'):
     if st.session_state['usuario_atual'].get('primeiro_acesso', False):
         st.markdown("<br><br>", unsafe_allow_html=True)
@@ -310,7 +302,6 @@ df_colab = db.ler_dados()
 
 total_colaboradores = len(df_colab)
 total_inativos = len(df_colab[df_colab['status'].str.lower() == 'inativo']) if not df_colab.empty else 0
-
 total_homens = len(df_colab[df_colab['genero'].str.lower() == 'masculino']) if not df_colab.empty else 0
 total_mulheres = len(df_colab[df_colab['genero'].str.lower() == 'feminino']) if not df_colab.empty else 0
 
@@ -321,13 +312,14 @@ ppd_count = len(df_colab[df_colab['local'] == 'PPD']) if not df_colab.empty else
 
 def count_setor_ativos(local, setor):
     if df_colab.empty: return 0
-    return len(df_colab[(df_colab['local'] == local) & (df_colab['setor'] == setor) & (df_colab['status'].str.lower() != 'inativo')])
+    return len(df_colab[(df_colab['local'] == local) & (df_colab['setor'].str.strip().str.lower() == str(setor).strip().lower()) & (df_colab['status'].str.lower() != 'inativo')])
 
 def count_setor_todos(local, setor):
     if df_colab.empty: return 0
-    return len(df_colab[(df_colab['local'] == local) & (df_colab['setor'] == setor)])
+    return len(df_colab[(df_colab['local'] == local) & (df_colab['setor'].str.strip().str.lower() == str(setor).strip().lower())])
 
 df_exibicao_segura = aplicar_lgpd(df_colab, usuario_logado['perfil'])
+
 
 # --- SIDEBAR (Menu Lateral) ---
 with st.sidebar:
@@ -367,21 +359,20 @@ with st.sidebar:
                     with st.expander(f"{u['nome']} ({u['perfil']})"):
                         e_nome = st.text_input("Nome", value=u['nome'], key=f"e_n_{u['id']}")
                         e_perf = st.selectbox("Perfil", ["Usuario", "Admin"], index=0 if u['perfil']=='Usuario' else 1, key=f"e_p_{u['id']}")
-                        
                         colA, colB, colC = st.columns([1, 1, 1])
                         with colA:
-                            if st.button("💾 Salvar", key=f"sv_{u['id']}", help="Salvar nome/perfil"):
+                            if st.button("💾", key=f"sv_{u['id']}", help="Salvar nome/perfil"):
                                 db.atualizar_usuario_info(u['id'], e_nome, e_perf)
-                                st.success("Atualizado!")
+                                st.success("OK")
                                 st.rerun()
                         with colB:
-                            if st.button("🔑 Resetar", key=f"rs_{u['id']}", help="Reseta a senha para 123"):
+                            if st.button("🔑", key=f"rs_{u['id']}", help="Reseta a senha para 123"):
                                 db.resetar_senha(u['username'])
                                 db.registrar_log(usuario_logado['nome'], "Reset de Senha", f"Senha de '{u['username']}' resetada.")
-                                st.success("Senha resetada para '123'!")
+                                st.success("Reset OK!")
                         with colC:
                             if u['username'] != 'bruno.admin': 
-                                if st.button("🗑️ Excluir", key=f"del_{u['id']}"):
+                                if st.button("🗑️", key=f"del_{u['id']}", help="Excluir Usuário"):
                                     db.excluir_usuario(u['username'])
                                     db.registrar_log(usuario_logado['nome'], "Exclusão", f"Excluiu '{u['username']}'")
                                     st.rerun()
@@ -392,10 +383,17 @@ with st.sidebar:
         st.session_state['logado'] = False
         st.rerun()
 
-
-# --- HEADER SUPERIOR ---
-col_titulo, col_vazia, col_export = st.columns([3, 1, 1])
-with col_titulo: st.title(menu_selecionado.split(" - ")[0])
+# --- HEADER SUPERIOR COM PESQUISA INTELIGENTE ---
+col_titulo, col_busca, col_btn = st.columns([1.5, 2, 1])
+with col_titulo: 
+    st.title(menu_selecionado.split(" - ")[0])
+with col_busca:
+    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+    termo_busca = st.text_input("🔍 Pesquisa Inteligente", placeholder="Pesquisar talento, setor, departamento...", label_visibility="collapsed")
+with col_btn:
+    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+    if st.button("🔄 Atualizar Dados", use_container_width=True):
+        st.rerun()
 
 
 # ==========================================
@@ -405,8 +403,8 @@ if menu_selecionado == "Home - Dashboard":
     k1, k2, k3, k4 = st.columns(4)
     with k1: st.markdown(f'<div class="kpi-main-card"><div class="kpi-main-title">TOTAL DE COLABORADORES</div><div class="kpi-main-value">{total_colaboradores}</div></div>', unsafe_allow_html=True)
     with k2: st.markdown(f'<div class="kpi-main-card" style="background-color: #F9FAFB;"><div class="kpi-main-title">INATIVOS</div><div class="kpi-main-value" style="color: #9CA3AF;">{total_inativos}</div></div>', unsafe_allow_html=True)
-    with k3: st.markdown(f'<div class="kpi-main-card border-gender"><div class="kpi-main-title">HOMENS</div><div class="kpi-main-value" style="color: #1976D2;">{total_homens}</div></div>', unsafe_allow_html=True)
-    with k4: st.markdown(f'<div class="kpi-main-card border-gender"><div class="kpi-main-title">MULHERES</div><div class="kpi-main-value" style="color: #C2185B;">{total_mulheres}</div></div>', unsafe_allow_html=True)
+    with k3: st.markdown(f'<div class="kpi-main-card"><div class="kpi-main-title" style="color:#1976D2;">HOMENS</div><div class="kpi-main-value" style="color: #1976D2;">{total_homens}</div></div>', unsafe_allow_html=True)
+    with k4: st.markdown(f'<div class="kpi-main-card"><div class="kpi-main-title" style="color:#C2185B;">MULHERES</div><div class="kpi-main-value" style="color: #C2185B;">{total_mulheres}</div></div>', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
     h1, h2, h3, h4 = st.columns(4)
@@ -415,9 +413,9 @@ if menu_selecionado == "Home - Dashboard":
     with h3: st.markdown(f'<div class="kpi-sub-card border-pf"><div class="kpi-sub-title">PF (Procuradoria Fiscal)</div><div class="kpi-sub-value">{pf_count}</div></div>', unsafe_allow_html=True)
     with h4: st.markdown(f'<div class="kpi-sub-card border-ppd"><div class="kpi-sub-title">PPD</div><div class="kpi-sub-value">{ppd_count}</div></div>', unsafe_allow_html=True)
 
-    # --- EDIÇÃO DIRETA NAS LISTAS E EXPORTAÇÃO ---
+    # --- EDIÇÃO DIRETA NAS LISTAS E EXPORTAÇÃO (Com Filtro de Busca Integrado) ---
     with st.expander("📊 Clique aqui para Listar/Editar/Exportar dados dos KPIs Acima"):
-        filtro_relatorio = st.radio("Selecione o filtro:", ["Listar Ativos", "Listar Inativos", "Listar Afastados", "Listar PJ", "Listar SEDE", "Listar PF", "Listar Homens", "Listar Mulheres", "Listar Todos"], horizontal=True)
+        filtro_relatorio = st.radio("Filtro Categoria:", ["Listar Ativos", "Listar Inativos", "Listar Afastados", "Listar PJ", "Listar SEDE", "Listar PF", "Listar Homens", "Listar Mulheres", "Listar Todos"], horizontal=True)
         
         df_view = df_exibicao_segura.copy()
         if filtro_relatorio == "Listar Ativos": df_view = df_view[df_view['status'].str.lower() == 'ativo']
@@ -429,25 +427,28 @@ if menu_selecionado == "Home - Dashboard":
         elif filtro_relatorio == "Listar Homens": df_view = df_view[df_view['genero'].str.lower() == 'masculino']
         elif filtro_relatorio == "Listar Mulheres": df_view = df_view[df_view['genero'].str.lower() == 'feminino']
         
+        # Aplica Pesquisa Inteligente
+        if termo_busca and not df_view.empty:
+            df_view = df_view[df_view.apply(lambda row: row.astype(str).str.contains(termo_busca, case=False, na=False).any(), axis=1)]
+        
         if usuario_logado['perfil'] == 'Admin' and not df_view.empty:
-            st.caption("Você é Admin. Dê um clique duplo na célula para corrigir nomes, locais ou mudar o status. Depois clique em 'Salvar'.")
+            st.caption("Você é Admin. Dê um clique duplo na célula para corrigir dados. Depois clique em 'Salvar'.")
             edited_df = st.data_editor(df_view, use_container_width=True, hide_index=True, disabled=["id", "email"])
             c1, c2 = st.columns([1, 4])
             with c1:
-                if st.button("💾 Salvar Alterações na Base", type="primary"):
+                if st.button("💾 Salvar Alterações", type="primary"):
                     try:
                         for _, row in edited_df.iterrows():
                             db.atualizar_colaborador(row['id'], row['nome'], row['genero'], row['local'], row['setor'], row['status'], row.get('email', ''), row.get('raca', ''))
-                        st.success("Dados atualizados com sucesso!")
+                        st.success("Atualizado!")
                         st.rerun()
-                    except Exception as e: st.error(f"Erro ao salvar: {e}")
+                    except Exception as e: st.error(f"Erro: {e}")
         else:
             st.dataframe(df_view, use_container_width=True, hide_index=True)
+            if termo_busca and df_view.empty: st.warning(f"Nenhum colaborador encontrado para a pesquisa: '{termo_busca}'")
             
         if not df_view.empty:
-            csv_kpi = df_view.to_csv(index=False).encode('utf-8')
-            st.download_button(f"📥 Exportar Planilha", data=csv_kpi, file_name=f'relatorio_{filtro_relatorio.replace(" ", "_").lower()}.csv', mime='text/csv')
-
+            st.download_button(f"📥 Exportar Planilha", data=df_view.to_csv(index=False).encode('utf-8'), file_name=f'relatorio.csv', mime='text/csv')
 
     # --- DISTRIBUIÇÃO DEPARTAMENTAL ---
     st.markdown('<div class="section-title" style="display:flex; justify-content:space-between;"><span>Distribuição Departamental</span><span style="font-size:0.75rem; color:#9CA3AF; text-transform:uppercase; font-weight:600;">Mapeamento Organizacional</span></div>', unsafe_allow_html=True)
@@ -511,7 +512,7 @@ if menu_selecionado == "Home - Dashboard":
     st.markdown('<hr style="margin:2rem 0;">', unsafe_allow_html=True)
     v1, v2 = st.columns([1, 2])
     with v1: st.markdown('<div class="section-title" style="margin-top:0;">Vagas Abertas</div>', unsafe_allow_html=True)
-    with v2: filtro_vaga = st.radio("Filtro", ["Tudo", "PJ", "SEDE", "PF", "PPD"], horizontal=True, label_visibility="collapsed")
+    with v2: filtro_vaga = st.radio("Filtro Vagas", ["Tudo", "PJ", "SEDE", "PF", "PPD"], horizontal=True, label_visibility="collapsed")
     
     df_metas_banco = db.ler_metas()
     lista_vagas_abertas = []
@@ -542,8 +543,12 @@ if menu_selecionado == "Home - Dashboard":
     
     df_vagas_filtrado = df_vagas_dinamico if (filtro_vaga == "Tudo" or df_vagas_dinamico.empty) else df_vagas_dinamico[df_vagas_dinamico['Filtro'] == filtro_vaga]
     
+    # Aplica Pesquisa Inteligente nas Vagas
+    if termo_busca and not df_vagas_filtrado.empty:
+        df_vagas_filtrado = df_vagas_filtrado[df_vagas_filtrado.apply(lambda row: row.astype(str).str.contains(termo_busca, case=False, na=False).any(), axis=1)]
+    
     if df_vagas_filtrado.empty:
-        st.markdown("<p style='text-align:center; padding: 2rem; color: gray;'>Quadro completo! Nenhuma vaga aberta no momento.</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center; padding: 2rem; color: gray;'>Nenhuma vaga aberta encontrada para este filtro/pesquisa.</p>", unsafe_allow_html=True)
     else:
         for _, row in df_vagas_filtrado.iterrows():
             cols = st.columns([2, 3, 1, 2])
@@ -561,19 +566,21 @@ if menu_selecionado == "Home - Dashboard":
 elif menu_selecionado == "Configurações ⚙️":
     st.markdown('<div class="css-card">', unsafe_allow_html=True)
     st.subheader("⚙️ Configurações de Vagas por Departamento")
-    st.write("Abaixo você pode definir a quantidade alvo (Meta de Vagas) para cada setor. O sistema usará este valor para calcular automaticamente quantas vagas estão abertas subtraindo a quantidade de colaboradores ativos no setor.")
+    st.write("Abaixo você pode definir a quantidade alvo (Meta de Vagas) para cada setor. O sistema usará este valor para calcular automaticamente quantas vagas estão abertas.")
     
     df_metas_atual = db.ler_metas()
+    if termo_busca and not df_metas_atual.empty:
+        df_metas_atual = df_metas_atual[df_metas_atual.apply(lambda row: row.astype(str).str.contains(termo_busca, case=False, na=False).any(), axis=1)]
+        
     st.caption("Dê um duplo clique na coluna 'meta' para alterar o número de vagas. Os outros campos são bloqueados.")
     edited_metas = st.data_editor(df_metas_atual, use_container_width=True, hide_index=True, disabled=["local", "setor"])
     
     if st.button("💾 Salvar Novas Metas", type="primary"):
         try:
             db.atualizar_metas(edited_metas, usuario_logado['nome'])
-            st.success("Metas atualizadas com sucesso! O cálculo de vagas abertas no Dashboard já reflete os novos números.")
+            st.success("Metas atualizadas com sucesso!")
             st.rerun()
-        except Exception as e:
-            st.error(f"Erro ao salvar metas: {e}")
+        except Exception as e: st.error(f"Erro ao salvar metas: {e}")
     st.markdown('</div>', unsafe_allow_html=True)
 
 
@@ -604,6 +611,14 @@ elif menu_selecionado == "Gestão de Pessoas":
                 else: st.error("Erro: Um colaborador com este nome exato já existe.")
             else: st.warning("O Nome é obrigatório.")
     st.markdown('</div>', unsafe_allow_html=True)
+    
+    if termo_busca:
+        st.markdown('<div class="css-card">', unsafe_allow_html=True)
+        st.subheader("🔎 Resultado da Pesquisa")
+        df_busca = df_exibicao_segura[df_exibicao_segura.apply(lambda row: row.astype(str).str.contains(termo_busca, case=False, na=False).any(), axis=1)]
+        if df_busca.empty: st.warning("Nenhum registro encontrado.")
+        else: st.dataframe(df_busca, use_container_width=True, hide_index=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ==========================================
@@ -612,12 +627,12 @@ elif menu_selecionado == "Gestão de Pessoas":
 elif menu_selecionado == "Integração de Dados (Planilhas)":
     st.markdown('<div class="css-card">', unsafe_allow_html=True)
     st.subheader("🔗 Importação em Massa")
-    st.write("A planilha deve conter obrigatoriamente as colunas: **nome**, **genero**, **local**, **setor** e **status** (Ativo/Afastado/Inativo).")
+    st.write("A planilha deve conter obrigatoriamente as colunas: **nome**, **genero**, **local**, **setor** e **status**.")
     
     arquivo = st.file_uploader("Selecione a planilha (Excel ou CSV)", type=['xlsx', 'csv'])
     if arquivo:
         try:
-            if arquivo.name.endswith('.csv'): df_import = pd.read_csv(arquivo, delimiter=';')
+            if arquivo.name.endswith('.csv'): df_import = pd.read_csv(arquivo, delimiter=';', encoding='utf-8', on_bad_lines='skip')
             else: df_import = pd.read_excel(arquivo)
             df_import.columns = df_import.columns.str.lower().str.strip()
             df_import.columns = df_import.columns.str.replace(r'[^\w\s]', '', regex=True)
@@ -627,7 +642,7 @@ elif menu_selecionado == "Integração de Dados (Planilhas)":
             if st.button("Gravar Dados no Sistema", type="primary", use_container_width=True):
                 qtd = db.importar_massa(df_import, usuario_logado['nome'])
                 if qtd > 0: st.success(f"{qtd} registros processados/atualizados com sucesso!")
-                else: st.warning("Nenhum dado importado. Verifique o nome exato das colunas na sua planilha original.")
+                else: st.warning("Nenhum dado importado. Verifique os nomes das colunas.")
         except Exception as e: st.error(f"Erro ao ler arquivo: {e}")
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -639,7 +654,9 @@ elif menu_selecionado == "Auditoria e Logs 🔐":
     st.markdown('<div class="css-card">', unsafe_allow_html=True)
     st.subheader("Histórico de Acessos e Alterações")
     df_logs = db.ler_logs()
-    busca = st.text_input("🔍 Buscar no log:")
-    if busca: df_logs = df_logs[df_logs['usuario'].str.contains(busca, case=False, na=False) | df_logs['acao'].str.contains(busca, case=False, na=False)]
+    
+    if termo_busca:
+        df_logs = df_logs[df_logs.apply(lambda row: row.astype(str).str.contains(termo_busca, case=False, na=False).any(), axis=1)]
+        
     st.dataframe(df_logs, use_container_width=True, hide_index=True)
     st.markdown('</div>', unsafe_allow_html=True)
