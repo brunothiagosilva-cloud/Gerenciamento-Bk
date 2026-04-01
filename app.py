@@ -28,6 +28,7 @@ st.markdown("""
     .border-sede { border-left: 4px solid #6B7280; }
     .border-pf { border-left: 4px solid #7DD3FC; }
     .border-ppd { border-left: 4px solid #8B4513; }
+    .border-gender { border-left: 4px solid #9C27B0; } /* Cor para gênero */
     .kpi-sub-title { color: #6B7280; font-size: 0.9rem; font-weight: 800; margin-bottom: 0.2rem; }
     .kpi-sub-value { color: #111827; font-size: 1.8rem; font-weight: 700; margin: 0; }
     
@@ -147,9 +148,10 @@ class DatabaseManager:
             '''))
             
             if conn.execute(text("SELECT COUNT(*) FROM users_v3")).scalar() == 0:
+                # O Admin padrão também começa com primeiro_acesso = TRUE para forçar a troca
                 conn.execute(text('''
                     INSERT INTO users_v3 (username, senha, perfil, nome, primeiro_acesso) VALUES 
-                    ('bruno.admin', '123', 'Admin', 'Bruno Silva', FALSE)
+                    ('bruno.admin', '123', 'Admin', 'Bruno Silva', TRUE)
                 '''))
                 
             if conn.execute(text("SELECT COUNT(*) FROM metas_vagas")).scalar() == 0:
@@ -183,6 +185,7 @@ class DatabaseManager:
     def criar_usuario(self, username, senha, perfil, nome):
         with self.engine.connect() as conn:
             try:
+                # Sempre cria com primeiro_acesso TRUE
                 conn.execute(text("INSERT INTO users_v3 (username, senha, perfil, nome, primeiro_acesso) VALUES (:usr, :pwd, :prf, :nom, TRUE)"),
                              {"usr": username, "pwd": senha, "prf": perfil, "nom": nome})
                 conn.commit()
@@ -253,6 +256,28 @@ class DatabaseManager:
                 nome = str(row.get('nome', '')).strip()
                 if nome and nome != 'nan':
                     try:
+                        # Limpeza e Padronização dos Dados de Importação
+                        local_importado = str(row.get('local', 'Não Informado')).strip().upper()
+                        # Tratamento específico para mapear PJ, SEDE, PF corretamente
+                        if "PJ" in local_importado or "PROCURADORIA JUDICIAL" in local_importado:
+                            local_tratado = "PJ"
+                        elif "SEDE" in local_importado:
+                            local_tratado = "SEDE"
+                        elif "PF" in local_importado or "PROCURADORIA FISCAL" in local_importado:
+                            local_tratado = "PF"
+                        elif "PPD" in local_importado:
+                            local_tratado = "PPD"
+                        else:
+                            local_tratado = local_importado
+
+                        setor_tratado = str(row.get('setor', 'Não Informado')).strip()
+
+                        # Padronizar Gênero (M/F -> Masculino/Feminino) se necessário
+                        genero_importado = str(row.get('genero', 'Não Informado')).strip()
+                        if genero_importado.upper() == 'M': genero_tratado = 'Masculino'
+                        elif genero_importado.upper() == 'F': genero_tratado = 'Feminino'
+                        else: genero_tratado = genero_importado
+
                         conn.execute(text('''
                             INSERT INTO colab_v3 (nome, genero, local, setor, status, email, raca)
                             VALUES (:nome, :genero, :local, :setor, :status, '', 'Não Informado')
@@ -260,12 +285,15 @@ class DatabaseManager:
                             genero = EXCLUDED.genero, local = EXCLUDED.local, 
                             setor = EXCLUDED.setor, status = EXCLUDED.status
                         '''), {
-                            "nome": nome, "genero": str(row.get('genero', 'Não Informado')),
-                            "local": str(row.get('local', 'Não Informado')), "setor": str(row.get('setor', 'Não Informado')),
-                            "status": str(row.get('status', 'Ativo'))
+                            "nome": nome, 
+                            "genero": genero_tratado,
+                            "local": local_tratado, 
+                            "setor": setor_tratado,
+                            "status": str(row.get('status', 'Ativo')).strip()
                         })
                         registros_inseridos += 1
-                    except: pass 
+                    except Exception as e:
+                        pass # Silencia erros individuais para não quebrar a importação toda
             conn.commit()
         if registros_inseridos > 0: 
             self.registrar_log(usuario, "Importação em Massa", f"Processados {registros_inseridos} colaboradores.")
@@ -312,6 +340,7 @@ if not st.session_state.get('logado'):
 # ==========================================
 # VERIFICAÇÃO DE PRIMEIRO ACESSO (CORRIGIDA)
 # ==========================================
+# Agora a tela de troca de senha aparece imediatamente após o login se a flag for True
 if st.session_state.get('logado', False) and st.session_state.get('usuario_atual'):
     if st.session_state['usuario_atual'].get('primeiro_acesso', False):
         st.markdown("<br><br>", unsafe_allow_html=True)
@@ -319,7 +348,7 @@ if st.session_state.get('logado', False) and st.session_state.get('usuario_atual
         with c2:
             st.markdown('<div class="css-card" style="border-top: 5px solid #005F60;">', unsafe_allow_html=True)
             st.subheader("⚠️ Troca de Senha Obrigatória")
-            st.write("Bem-vindo(a)! Como este é o seu primeiro acesso, crie uma senha pessoal e segura.")
+            st.write(f"Bem-vindo(a) **{st.session_state['usuario_atual']['nome']}**! Como este é o seu primeiro acesso, crie uma senha pessoal e segura para continuar.")
             nova_senha = st.text_input("Nova Senha", type="password")
             confirma_senha = st.text_input("Confirme a Senha", type="password")
             
@@ -331,7 +360,7 @@ if st.session_state.get('logado', False) and st.session_state.get('usuario_atual
                 else:
                     db.atualizar_senha(st.session_state['usuario_atual']['username'], nova_senha)
                     st.session_state['usuario_atual']['primeiro_acesso'] = False
-                    st.success("Senha atualizada! Redirecionando...")
+                    st.success("Senha atualizada com sucesso! Redirecionando...")
                     st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
         st.stop()
@@ -343,8 +372,13 @@ if st.session_state.get('logado', False) and st.session_state.get('usuario_atual
 usuario_logado = st.session_state['usuario_atual']
 df_colab = db.ler_dados()
 
+# Variáveis de KPI
 total_colaboradores = len(df_colab)
-total_inativos = len(df_colab[df_colab['status'] == 'Inativo']) if not df_colab.empty else 0
+total_inativos = len(df_colab[df_colab['status'].str.lower() == 'inativo']) if not df_colab.empty else 0
+
+# Contagem por Gênero
+total_homens = len(df_colab[df_colab['genero'].str.lower() == 'masculino']) if not df_colab.empty else 0
+total_mulheres = len(df_colab[df_colab['genero'].str.lower() == 'feminino']) if not df_colab.empty else 0
 
 pj_count = len(df_colab[df_colab['local'] == 'PJ']) if not df_colab.empty else 0
 sede_count = len(df_colab[df_colab['local'] == 'SEDE']) if not df_colab.empty else 0
@@ -353,11 +387,12 @@ ppd_count = len(df_colab[df_colab['local'] == 'PPD']) if not df_colab.empty else
 
 def count_setor_ativos(local, setor):
     if df_colab.empty: return 0
-    return len(df_colab[(df_colab['local'] == local) & (df_colab['setor'] == setor) & (df_colab['status'] != 'Inativo')])
+    # Compara convertendo para lower para evitar problemas de maiúscula/minúscula
+    return len(df_colab[(df_colab['local'] == local) & (df_colab['setor'].str.strip().str.lower() == str(setor).strip().lower()) & (df_colab['status'].str.lower() != 'inativo')])
 
 def count_setor_todos(local, setor):
     if df_colab.empty: return 0
-    return len(df_colab[(df_colab['local'] == local) & (df_colab['setor'] == setor)])
+    return len(df_colab[(df_colab['local'] == local) & (df_colab['setor'].str.strip().str.lower() == str(setor).strip().lower())])
 
 df_exibicao_segura = aplicar_lgpd(df_colab, usuario_logado['perfil'])
 
@@ -384,17 +419,17 @@ with st.sidebar:
                 with st.form("form_novo_user"):
                     novo_nome = st.text_input("Nome Completo")
                     novo_usr = st.text_input("Login").lower()
-                    nova_senha = st.text_input("Senha Temporária", type="password")
+                    nova_senha = st.text_input("Senha Provisória", type="password")
                     novo_perfil = st.selectbox("Perfil", ["Usuario", "Admin"])
                     if st.form_submit_button("Salvar Usuário", use_container_width=True):
                         if novo_nome and novo_usr and nova_senha:
                             if db.criar_usuario(novo_usr, nova_senha, novo_perfil, novo_nome):
                                 db.registrar_log(usuario_logado['nome'], "Criação de Usuário", f"Criou o login '{novo_usr}'")
-                                st.success("Usuário criado!")
+                                st.success("Usuário criado com sucesso!")
                             else: 
                                 st.error("Erro: Login já existe.")
                         else: 
-                            st.warning("Preencha tudo.")
+                            st.warning("Preencha todos os campos.")
             
             with tab_list:
                 df_users = db.listar_usuarios()
@@ -431,30 +466,36 @@ with col_titulo:
 # TELA 1: HOME (DASHBOARD)
 # ==========================================
 if menu_selecionado == "Home - Dashboard":
-    k1, k2 = st.columns(2)
+    k1, k2, k3, k4 = st.columns(4)
     with k1:
         st.markdown(f'<div class="kpi-main-card"><div class="kpi-main-title">TOTAL DE COLABORADORES</div><div class="kpi-main-value">{total_colaboradores}</div></div>', unsafe_allow_html=True)
     with k2:
         st.markdown(f'<div class="kpi-main-card" style="background-color: #F9FAFB;"><div class="kpi-main-title">INATIVOS</div><div class="kpi-main-value" style="color: #9CA3AF;">{total_inativos}</div></div>', unsafe_allow_html=True)
+    with k3:
+        st.markdown(f'<div class="kpi-main-card"><div class="kpi-main-title">HOMENS</div><div class="kpi-main-value" style="color: #1976D2;">{total_homens}</div></div>', unsafe_allow_html=True)
+    with k4:
+        st.markdown(f'<div class="kpi-main-card"><div class="kpi-main-title">MULHERES</div><div class="kpi-main-value" style="color: #C2185B;">{total_mulheres}</div></div>', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
     h1, h2, h3, h4 = st.columns(4)
-    with h1: st.markdown(f'<div class="kpi-sub-card border-pj"><div class="kpi-sub-title">PJ</div><div class="kpi-sub-value">{pj_count}</div></div>', unsafe_allow_html=True)
+    with h1: st.markdown(f'<div class="kpi-sub-card border-pj"><div class="kpi-sub-title">PJ (Procuradoria Judicial)</div><div class="kpi-sub-value">{pj_count}</div></div>', unsafe_allow_html=True)
     with h2: st.markdown(f'<div class="kpi-sub-card border-sede"><div class="kpi-sub-title">SEDE</div><div class="kpi-sub-value">{sede_count}</div></div>', unsafe_allow_html=True)
-    with h3: st.markdown(f'<div class="kpi-sub-card border-pf"><div class="kpi-sub-title">PF</div><div class="kpi-sub-value">{pf_count}</div></div>', unsafe_allow_html=True)
+    with h3: st.markdown(f'<div class="kpi-sub-card border-pf"><div class="kpi-sub-title">PF (Procuradoria Fiscal)</div><div class="kpi-sub-value">{pf_count}</div></div>', unsafe_allow_html=True)
     with h4: st.markdown(f'<div class="kpi-sub-card border-ppd"><div class="kpi-sub-title">PPD</div><div class="kpi-sub-value">{ppd_count}</div></div>', unsafe_allow_html=True)
 
     # --- EDIÇÃO DIRETA NAS LISTAS E EXPORTAÇÃO ---
     with st.expander("📊 Clique aqui para Listar/Editar/Exportar dados dos KPIs Acima"):
-        filtro_relatorio = st.radio("Selecione o filtro:", ["Listar Ativos", "Listar Inativos", "Listar Afastados", "Listar PJ", "Listar SEDE", "Listar PF", "Listar Todos"], horizontal=True)
+        filtro_relatorio = st.radio("Selecione o filtro:", ["Listar Ativos", "Listar Inativos", "Listar Afastados", "Listar PJ", "Listar SEDE", "Listar PF", "Listar Homens", "Listar Mulheres", "Listar Todos"], horizontal=True)
         
         df_view = df_exibicao_segura.copy()
-        if filtro_relatorio == "Listar Ativos": df_view = df_view[df_view['status'] == 'Ativo']
-        elif filtro_relatorio == "Listar Inativos": df_view = df_view[df_view['status'] == 'Inativo']
-        elif filtro_relatorio == "Listar Afastados": df_view = df_view[df_view['status'] == 'Afastado']
+        if filtro_relatorio == "Listar Ativos": df_view = df_view[df_view['status'].str.lower() == 'ativo']
+        elif filtro_relatorio == "Listar Inativos": df_view = df_view[df_view['status'].str.lower() == 'inativo']
+        elif filtro_relatorio == "Listar Afastados": df_view = df_view[df_view['status'].str.lower() == 'afastado']
         elif filtro_relatorio == "Listar PJ": df_view = df_view[df_view['local'] == 'PJ']
         elif filtro_relatorio == "Listar SEDE": df_view = df_view[df_view['local'] == 'SEDE']
         elif filtro_relatorio == "Listar PF": df_view = df_view[df_view['local'] == 'PF']
+        elif filtro_relatorio == "Listar Homens": df_view = df_view[df_view['genero'].str.lower() == 'masculino']
+        elif filtro_relatorio == "Listar Mulheres": df_view = df_view[df_view['genero'].str.lower() == 'feminino']
         
         if usuario_logado['perfil'] == 'Admin' and not df_view.empty:
             st.caption("Você é Admin. Dê um clique duplo na célula para corrigir nomes, locais ou mudar o status. Depois clique em 'Salvar'.")
@@ -482,7 +523,7 @@ if menu_selecionado == "Home - Dashboard":
     col_pj, col_sede, col_pf = st.columns(3)
     
     with col_pj:
-        st.markdown(f'<div class="dept-header"><span class="dept-title"><span class="dot-pj"></span>Procuradoria Judicial</span><span class="dept-total-badge">{pj_count}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="dept-header"><span class="dept-title"><span class="dot-pj"></span>PJ (Procuradoria Judicial)</span><span class="dept-total-badge">{pj_count}</span></div>', unsafe_allow_html=True)
         st.markdown(f'<div class="dept-item"><span class="dept-name">Cálculos</span><span class="dept-num">{count_setor_todos("PJ", "Cálculos")}</span></div>', unsafe_allow_html=True)
         st.markdown(f'<div class="dept-item"><span class="dept-name">Obrigação de Fazer</span><span class="dept-num">{count_setor_todos("PJ", "Obrigação de Fazer")}</span></div>', unsafe_allow_html=True)
         st.markdown(f'<div class="dept-item"><span class="dept-name">OPV</span><span class="dept-num">{count_setor_todos("PJ", "OPV")}</span></div>', unsafe_allow_html=True)
@@ -534,7 +575,6 @@ if menu_selecionado == "Home - Dashboard":
             st.markdown(f'<div class="dept-item"><span class="dept-name">Levantamento</span><span class="dept-num" style="color:#7DD3FC;">{count_setor_todos("PF", "Levantamento")}</span></div>', unsafe_allow_html=True)
             st.markdown(f'<div class="dept-item"><span class="dept-name">Multirão Garantia</span><span class="dept-num" style="color:#7DD3FC;">{count_setor_todos("PF", "Multirão Garantia")}</span></div>', unsafe_allow_html=True)
             st.markdown(f'<div class="dept-item"><span class="dept-name">Jurimetria</span><span class="dept-num" style="color:#7DD3FC;">{count_setor_todos("PF", "Jurimetria")}</span></div>', unsafe_allow_html=True)
-
 
     # --- CÁLCULO DINÂMICO DE VAGAS ABERTAS (Lendo as Metas do BD) ---
     st.markdown('<hr style="margin:2rem 0;">', unsafe_allow_html=True)
@@ -651,9 +691,14 @@ elif menu_selecionado == "Integração de Dados (Planilhas)":
     arquivo = st.file_uploader("Selecione a planilha (Excel ou CSV)", type=['xlsx', 'csv'])
     if arquivo:
         try:
-            if arquivo.name.endswith('.csv'): df_import = pd.read_csv(arquivo)
+            if arquivo.name.endswith('.csv'): df_import = pd.read_csv(arquivo, delimiter=';') # tenta com ponto e virgula por ser CSV brasileiro as vezes
             else: df_import = pd.read_excel(arquivo)
+            
             df_import.columns = df_import.columns.str.lower().str.strip()
+            
+            # Remove caracteres especiais das colunas (ex: espaços)
+            df_import.columns = df_import.columns.str.replace(r'[^\w\s]', '', regex=True)
+            
             st.success("Planilha lida com sucesso! Visualize a prévia:")
             st.dataframe(df_import.head())
             if st.button("Gravar Dados no Sistema", type="primary", use_container_width=True):
@@ -661,7 +706,7 @@ elif menu_selecionado == "Integração de Dados (Planilhas)":
                 if qtd > 0: 
                     st.success(f"{qtd} registros processados/atualizados com sucesso!")
                 else: 
-                    st.warning("Nenhum dado importado. Verifique o nome exato das colunas.")
+                    st.warning("Nenhum dado importado. Verifique o nome exato das colunas na sua planilha original.")
         except Exception as e: 
             st.error(f"Erro ao ler arquivo: {e}")
     st.markdown('</div>', unsafe_allow_html=True)
