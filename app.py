@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import locale
+import unicodedata
 from datetime import datetime
 from sqlalchemy import create_engine, text
 
@@ -28,7 +29,6 @@ st.markdown("""
     .border-sede { border-left: 4px solid #6B7280; }
     .border-pf { border-left: 4px solid #7DD3FC; }
     .border-ppd { border-left: 4px solid #8B4513; }
-    .border-gender { border-left: 4px solid #9C27B0; } /* Cor para gênero */
     .kpi-sub-title { color: #6B7280; font-size: 0.9rem; font-weight: 800; margin-bottom: 0.2rem; }
     .kpi-sub-value { color: #111827; font-size: 1.8rem; font-weight: 700; margin: 0; }
     
@@ -54,7 +54,7 @@ st.markdown("""
 
 
 # ==========================================
-# ESTRUTURA ORGANIZACIONAL PADRÃO
+# ESTRUTURA ORGANIZACIONAL E PADRONIZAÇÃO
 # ==========================================
 DEFAULT_ALVOS = {
     "PJ": {"Cadastro Requisitórios": 5, "NIRA": 1, "Detran": 8, "Litispendência": 25, "Obrigação de Fazer": 28, "OPV": 28, "Trabalhista": 3, "TI": 6, "Nomeação Contador": 1, "Precatórios": 6, "Cálculos": 41, "Cartografia": 5, "NPM": 6, "NRST": 2},
@@ -70,13 +70,38 @@ ESTRUTURA = {
     "PPD": ["Equipe Geral"]
 }
 
+def remover_acentos_espacos(txt):
+    if pd.isna(txt): return ""
+    txt = str(txt).strip().lower()
+    return ''.join(c for c in unicodedata.normalize('NFD', txt) if unicodedata.category(c) != 'Mn')
+
+# Dicionário de mapeamento reverso para acertar exatamente o nome do setor do banco de dados
+MAPA_SETORES_NORM = {remover_acentos_espacos(s): s for loc, setores in ESTRUTURA.items() for s in setores}
+
+def padronizar_local(txt_local):
+    norm = remover_acentos_espacos(txt_local)
+    if 'pj' in norm or 'procuradoria judicial' in norm: return 'PJ'
+    elif 'sede' in norm: return 'SEDE'
+    elif 'pf' in norm or 'procuradoria fiscal' in norm: return 'PF'
+    elif 'ppd' in norm: return 'PPD'
+    return str(txt_local).strip().upper()
+
+def padronizar_setor(txt_setor):
+    norm = remover_acentos_espacos(txt_setor)
+    return MAPA_SETORES_NORM.get(norm, str(txt_setor).strip().title() if str(txt_setor).strip() else "Não Informado")
+
+def padronizar_genero(txt_genero):
+    norm = remover_acentos_espacos(txt_genero)
+    if norm in ['m', 'masc', 'masculino']: return 'Masculino'
+    if norm in ['f', 'fem', 'feminino']: return 'Feminino'
+    return 'Outro'
+
 
 # ==========================================
 # FUNÇÕES UTILITÁRIAS E LGPD
 # ==========================================
 def aplicar_lgpd(df: pd.DataFrame, perfil_usuario: str) -> pd.DataFrame:
-    if perfil_usuario == 'Admin' or df.empty: 
-        return df
+    if perfil_usuario == 'Admin' or df.empty: return df
     df_mascarado = df.copy()
     def mascarar_email(email):
         email = str(email)
@@ -87,12 +112,9 @@ def aplicar_lgpd(df: pd.DataFrame, perfil_usuario: str) -> pd.DataFrame:
 
 def render_status_badge(status):
     status_up = str(status).upper()
-    if "ATIVO" in status_up: 
-        return f'<span class="badge-status bg-active">{status}</span>'
-    elif "PRÉVIA" in status_up or "SHORTLISTING" in status_up: 
-        return f'<span class="badge-status bg-short">{status}</span>'
-    else: 
-        return f'<span class="badge-status bg-urgent">{status}</span>'
+    if "ATIVO" in status_up: return f'<span class="badge-status bg-active">{status}</span>'
+    elif "PRÉVIA" in status_up or "SHORTLISTING" in status_up: return f'<span class="badge-status bg-short">{status}</span>'
+    else: return f'<span class="badge-status bg-urgent">{status}</span>'
 
 
 # ==========================================
@@ -106,96 +128,50 @@ class DatabaseManager:
 
     def _inicializar_tabelas(self):
         with self.engine.connect() as conn:
-            conn.execute(text('''
-                CREATE TABLE IF NOT EXISTS colab_v3 (
-                    id SERIAL PRIMARY KEY,
-                    nome VARCHAR(150) UNIQUE NOT NULL,
-                    email VARCHAR(100),
-                    raca VARCHAR(50),
-                    genero VARCHAR(50),
-                    local VARCHAR(50),
-                    setor VARCHAR(100),
-                    status VARCHAR(20) DEFAULT 'Ativo'
-                )
-            '''))
-            conn.execute(text('''
-                CREATE TABLE IF NOT EXISTS auditoria_logs (
-                    id SERIAL PRIMARY KEY,
-                    data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    usuario VARCHAR(100),
-                    acao VARCHAR(255),
-                    detalhes TEXT
-                )
-            '''))
-            conn.execute(text('''
-                CREATE TABLE IF NOT EXISTS users_v3 (
-                    id SERIAL PRIMARY KEY,
-                    username VARCHAR(50) UNIQUE NOT NULL,
-                    senha VARCHAR(100) NOT NULL,
-                    perfil VARCHAR(20) NOT NULL,
-                    nome VARCHAR(100) NOT NULL,
-                    primeiro_acesso BOOLEAN DEFAULT TRUE
-                )
-            '''))
-            conn.execute(text('''
-                CREATE TABLE IF NOT EXISTS metas_vagas (
-                    id SERIAL PRIMARY KEY,
-                    local VARCHAR(50) NOT NULL,
-                    setor VARCHAR(100) NOT NULL,
-                    meta INTEGER DEFAULT 0,
-                    UNIQUE(local, setor)
-                )
-            '''))
-            
+            conn.execute(text('''CREATE TABLE IF NOT EXISTS colab_v3 (id SERIAL PRIMARY KEY, nome VARCHAR(150) UNIQUE NOT NULL, email VARCHAR(100), raca VARCHAR(50), genero VARCHAR(50), local VARCHAR(50), setor VARCHAR(100), status VARCHAR(20) DEFAULT 'Ativo')'''))
+            conn.execute(text('''CREATE TABLE IF NOT EXISTS auditoria_logs (id SERIAL PRIMARY KEY, data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP, usuario VARCHAR(100), acao VARCHAR(255), detalhes TEXT)'''))
+            conn.execute(text('''CREATE TABLE IF NOT EXISTS users_v3 (id SERIAL PRIMARY KEY, username VARCHAR(50) UNIQUE NOT NULL, senha VARCHAR(100) NOT NULL, perfil VARCHAR(20) NOT NULL, nome VARCHAR(100) NOT NULL, primeiro_acesso BOOLEAN DEFAULT TRUE)'''))
+            conn.execute(text('''CREATE TABLE IF NOT EXISTS metas_vagas (id SERIAL PRIMARY KEY, local VARCHAR(50) NOT NULL, setor VARCHAR(100) NOT NULL, meta INTEGER DEFAULT 0, UNIQUE(local, setor))'''))
             if conn.execute(text("SELECT COUNT(*) FROM users_v3")).scalar() == 0:
-                # O Admin padrão também começa com primeiro_acesso = TRUE para forçar a troca
-                conn.execute(text('''
-                    INSERT INTO users_v3 (username, senha, perfil, nome, primeiro_acesso) VALUES 
-                    ('bruno.admin', '123', 'Admin', 'Bruno Silva', TRUE)
-                '''))
-                
+                conn.execute(text("INSERT INTO users_v3 (username, senha, perfil, nome, primeiro_acesso) VALUES ('bruno.admin', '123', 'Admin', 'Bruno Silva', TRUE)"))
             if conn.execute(text("SELECT COUNT(*) FROM metas_vagas")).scalar() == 0:
                 for loc, setores in DEFAULT_ALVOS.items():
                     for setr, meta in setores.items():
-                        conn.execute(text("INSERT INTO metas_vagas (local, setor, meta) VALUES (:l, :s, :m)"), 
-                                     {"l": loc, "s": setr, "m": meta})
+                        conn.execute(text("INSERT INTO metas_vagas (local, setor, meta) VALUES (:l, :s, :m)"), {"l": loc, "s": setr, "m": meta})
             conn.commit()
 
-    # --- Funções de Metas (Configurações) ---
     def ler_metas(self) -> pd.DataFrame:
         return pd.read_sql("SELECT local, setor, meta FROM metas_vagas ORDER BY local, setor", self.engine)
 
     def atualizar_metas(self, df_metas, usuario):
         with self.engine.connect() as conn:
             for _, row in df_metas.iterrows():
-                conn.execute(text("UPDATE metas_vagas SET meta = :m WHERE local = :l AND setor = :s"),
-                             {"m": row['meta'], "l": row['local'], "s": row['setor']})
+                conn.execute(text("UPDATE metas_vagas SET meta = :m WHERE local = :l AND setor = :s"), {"m": row['meta'], "l": row['local'], "s": row['setor']})
             conn.commit()
         self.registrar_log(usuario, "Atualização de Metas", "Alterou os parâmetros de vagas no painel de configurações.")
 
-    # --- Funções de Usuários ---
     def autenticar_usuario(self, username, senha):
         with self.engine.connect() as conn:
-            result = conn.execute(text("SELECT username, senha, perfil, nome, primeiro_acesso FROM users_v3 WHERE username = :usr AND senha = :pwd"), 
-                                  {"usr": username, "pwd": senha}).fetchone()
-            if result: 
-                return {"username": result[0], "senha": result[1], "perfil": result[2], "nome": result[3], "primeiro_acesso": result[4]}
+            result = conn.execute(text("SELECT username, senha, perfil, nome, primeiro_acesso FROM users_v3 WHERE username = :usr AND senha = :pwd"), {"usr": username, "pwd": senha}).fetchone()
+            if result: return {"username": result[0], "senha": result[1], "perfil": result[2], "nome": result[3], "primeiro_acesso": result[4]}
             return None
 
     def criar_usuario(self, username, senha, perfil, nome):
         with self.engine.connect() as conn:
             try:
-                # Sempre cria com primeiro_acesso TRUE
-                conn.execute(text("INSERT INTO users_v3 (username, senha, perfil, nome, primeiro_acesso) VALUES (:usr, :pwd, :prf, :nom, TRUE)"),
-                             {"usr": username, "pwd": senha, "prf": perfil, "nom": nome})
+                conn.execute(text("INSERT INTO users_v3 (username, senha, perfil, nome, primeiro_acesso) VALUES (:usr, :pwd, :prf, :nom, TRUE)"), {"usr": username, "pwd": senha, "prf": perfil, "nom": nome})
                 conn.commit()
                 return True
-            except:
-                return False 
+            except: return False 
 
     def atualizar_senha(self, username, nova_senha):
         with self.engine.connect() as conn:
             conn.execute(text("UPDATE users_v3 SET senha = :pwd, primeiro_acesso = FALSE WHERE username = :usr"), {"pwd": nova_senha, "usr": username})
+            conn.commit()
+            
+    def resetar_senha(self, username):
+        with self.engine.connect() as conn:
+            conn.execute(text("UPDATE users_v3 SET senha = '123', primeiro_acesso = TRUE WHERE username = :usr"), {"usr": username})
             conn.commit()
             
     def atualizar_usuario_info(self, id_usr, nome, perfil):
@@ -212,15 +188,11 @@ class DatabaseManager:
                 conn.execute(text("DELETE FROM users_v3 WHERE username = :usr"), {"usr": username})
                 conn.commit()
                 return True
-            except:
-                return False
+            except: return False
 
-    # --- Funções de Logs e Colaboradores ---
     def registrar_log(self, usuario, acao, detalhes=""):
         with self.engine.connect() as conn:
-            conn.execute(text('''
-                INSERT INTO auditoria_logs (data_hora, usuario, acao, detalhes) VALUES (:dh, :usr, :acao, :det)
-            '''), {"dh": datetime.now(), "usr": usuario, "acao": acao, "det": detalhes})
+            conn.execute(text("INSERT INTO auditoria_logs (data_hora, usuario, acao, detalhes) VALUES (:dh, :usr, :acao, :det)"), {"dh": datetime.now(), "usr": usuario, "acao": acao, "det": detalhes})
             conn.commit()
 
     def ler_logs(self) -> pd.DataFrame:
@@ -232,21 +204,15 @@ class DatabaseManager:
     def adicionar_colaborador(self, dados: dict, usuario: str):
         with self.engine.connect() as conn:
             try:
-                conn.execute(text('''
-                    INSERT INTO colab_v3 (nome, email, raca, genero, local, setor, status)
-                    VALUES (:nome, :email, :raca, :genero, :local, :setor, :status)
-                '''), dados)
+                conn.execute(text("INSERT INTO colab_v3 (nome, email, raca, genero, local, setor, status) VALUES (:nome, :email, :raca, :genero, :local, :setor, :status)"), dados)
                 conn.commit()
                 self.registrar_log(usuario, "Cadastro de Colaborador", f"Adicionado: {dados['nome']}")
                 return True
-            except:
-                return False
+            except: return False
                 
     def atualizar_colaborador(self, id_colab, nome, genero, local, setor, status, email, raca):
         with self.engine.connect() as conn:
-            conn.execute(text('''
-                UPDATE colab_v3 SET nome=:n, genero=:g, local=:l, setor=:s, status=:st, email=:e, raca=:r WHERE id=:id
-            '''), {"n": nome, "g": genero, "l": local, "s": setor, "st": status, "e": email, "r": raca, "id": id_colab})
+            conn.execute(text("UPDATE colab_v3 SET nome=:n, genero=:g, local=:l, setor=:s, status=:st, email=:e, raca=:r WHERE id=:id"), {"n": nome, "g": genero, "l": local, "s": setor, "st": status, "e": email, "r": raca, "id": id_colab})
             conn.commit()
 
     def importar_massa(self, df_importacao: pd.DataFrame, usuario: str):
@@ -256,27 +222,11 @@ class DatabaseManager:
                 nome = str(row.get('nome', '')).strip()
                 if nome and nome != 'nan':
                     try:
-                        # Limpeza e Padronização dos Dados de Importação
-                        local_importado = str(row.get('local', 'Não Informado')).strip().upper()
-                        # Tratamento específico para mapear PJ, SEDE, PF corretamente
-                        if "PJ" in local_importado or "PROCURADORIA JUDICIAL" in local_importado:
-                            local_tratado = "PJ"
-                        elif "SEDE" in local_importado:
-                            local_tratado = "SEDE"
-                        elif "PF" in local_importado or "PROCURADORIA FISCAL" in local_importado:
-                            local_tratado = "PF"
-                        elif "PPD" in local_importado:
-                            local_tratado = "PPD"
-                        else:
-                            local_tratado = local_importado
-
-                        setor_tratado = str(row.get('setor', 'Não Informado')).strip()
-
-                        # Padronizar Gênero (M/F -> Masculino/Feminino) se necessário
-                        genero_importado = str(row.get('genero', 'Não Informado')).strip()
-                        if genero_importado.upper() == 'M': genero_tratado = 'Masculino'
-                        elif genero_importado.upper() == 'F': genero_tratado = 'Feminino'
-                        else: genero_tratado = genero_importado
+                        loc_tratado = padronizar_local(row.get('local', ''))
+                        setor_tratado = padronizar_setor(row.get('setor', ''))
+                        gen_tratado = padronizar_genero(row.get('genero', ''))
+                        stts = str(row.get('status', 'Ativo')).strip()
+                        if not stts or stts.lower() == 'nan': stts = 'Ativo'
 
                         conn.execute(text('''
                             INSERT INTO colab_v3 (nome, genero, local, setor, status, email, raca)
@@ -285,23 +235,18 @@ class DatabaseManager:
                             genero = EXCLUDED.genero, local = EXCLUDED.local, 
                             setor = EXCLUDED.setor, status = EXCLUDED.status
                         '''), {
-                            "nome": nome, 
-                            "genero": genero_tratado,
-                            "local": local_tratado, 
-                            "setor": setor_tratado,
-                            "status": str(row.get('status', 'Ativo')).strip()
+                            "nome": nome, "genero": gen_tratado, "local": loc_tratado, 
+                            "setor": setor_tratado, "status": stts.title()
                         })
                         registros_inseridos += 1
-                    except Exception as e:
-                        pass # Silencia erros individuais para não quebrar a importação toda
+                    except Exception as e: pass 
             conn.commit()
         if registros_inseridos > 0: 
             self.registrar_log(usuario, "Importação em Massa", f"Processados {registros_inseridos} colaboradores.")
         return registros_inseridos
 
 @st.cache_resource
-def iniciar_conexao_banco():
-    return DatabaseManager()
+def iniciar_conexao_banco(): return DatabaseManager()
 
 
 # ==========================================
@@ -329,18 +274,12 @@ def tela_login():
                 st.error("Credenciais inválidas.")
         st.markdown('</div>', unsafe_allow_html=True)
 
-if 'logado' not in st.session_state: 
-    st.session_state['logado'] = False
-    
+if 'logado' not in st.session_state: st.session_state['logado'] = False
 if not st.session_state.get('logado'):
     tela_login()
     st.stop()
 
-
-# ==========================================
-# VERIFICAÇÃO DE PRIMEIRO ACESSO (CORRIGIDA)
-# ==========================================
-# Agora a tela de troca de senha aparece imediatamente após o login se a flag for True
+# VERIFICAÇÃO DE PRIMEIRO ACESSO
 if st.session_state.get('logado', False) and st.session_state.get('usuario_atual'):
     if st.session_state['usuario_atual'].get('primeiro_acesso', False):
         st.markdown("<br><br>", unsafe_allow_html=True)
@@ -348,15 +287,12 @@ if st.session_state.get('logado', False) and st.session_state.get('usuario_atual
         with c2:
             st.markdown('<div class="css-card" style="border-top: 5px solid #005F60;">', unsafe_allow_html=True)
             st.subheader("⚠️ Troca de Senha Obrigatória")
-            st.write(f"Bem-vindo(a) **{st.session_state['usuario_atual']['nome']}**! Como este é o seu primeiro acesso, crie uma senha pessoal e segura para continuar.")
+            st.write(f"Bem-vindo(a) **{st.session_state['usuario_atual']['nome']}**! Como este é o seu primeiro acesso (ou sua senha foi resetada), crie uma nova senha.")
             nova_senha = st.text_input("Nova Senha", type="password")
             confirma_senha = st.text_input("Confirme a Senha", type="password")
-            
             if st.button("Salvar e Acessar o Sistema", type="primary", use_container_width=True):
-                if len(nova_senha) < 4: 
-                    st.error("A senha deve ter pelo menos 4 caracteres.")
-                elif nova_senha != confirma_senha: 
-                    st.error("As senhas não coincidem.")
+                if len(nova_senha) < 4: st.error("A senha deve ter pelo menos 4 caracteres.")
+                elif nova_senha != confirma_senha: st.error("As senhas não coincidem.")
                 else:
                     db.atualizar_senha(st.session_state['usuario_atual']['username'], nova_senha)
                     st.session_state['usuario_atual']['primeiro_acesso'] = False
@@ -372,11 +308,9 @@ if st.session_state.get('logado', False) and st.session_state.get('usuario_atual
 usuario_logado = st.session_state['usuario_atual']
 df_colab = db.ler_dados()
 
-# Variáveis de KPI
 total_colaboradores = len(df_colab)
 total_inativos = len(df_colab[df_colab['status'].str.lower() == 'inativo']) if not df_colab.empty else 0
 
-# Contagem por Gênero
 total_homens = len(df_colab[df_colab['genero'].str.lower() == 'masculino']) if not df_colab.empty else 0
 total_mulheres = len(df_colab[df_colab['genero'].str.lower() == 'feminino']) if not df_colab.empty else 0
 
@@ -387,15 +321,13 @@ ppd_count = len(df_colab[df_colab['local'] == 'PPD']) if not df_colab.empty else
 
 def count_setor_ativos(local, setor):
     if df_colab.empty: return 0
-    # Compara convertendo para lower para evitar problemas de maiúscula/minúscula
-    return len(df_colab[(df_colab['local'] == local) & (df_colab['setor'].str.strip().str.lower() == str(setor).strip().lower()) & (df_colab['status'].str.lower() != 'inativo')])
+    return len(df_colab[(df_colab['local'] == local) & (df_colab['setor'] == setor) & (df_colab['status'].str.lower() != 'inativo')])
 
 def count_setor_todos(local, setor):
     if df_colab.empty: return 0
-    return len(df_colab[(df_colab['local'] == local) & (df_colab['setor'].str.strip().str.lower() == str(setor).strip().lower())])
+    return len(df_colab[(df_colab['local'] == local) & (df_colab['setor'] == setor)])
 
 df_exibicao_segura = aplicar_lgpd(df_colab, usuario_logado['perfil'])
-
 
 # --- SIDEBAR (Menu Lateral) ---
 with st.sidebar:
@@ -426,10 +358,8 @@ with st.sidebar:
                             if db.criar_usuario(novo_usr, nova_senha, novo_perfil, novo_nome):
                                 db.registrar_log(usuario_logado['nome'], "Criação de Usuário", f"Criou o login '{novo_usr}'")
                                 st.success("Usuário criado com sucesso!")
-                            else: 
-                                st.error("Erro: Login já existe.")
-                        else: 
-                            st.warning("Preencha todos os campos.")
+                            else: st.error("Erro: Login já existe.")
+                        else: st.warning("Preencha todos os campos.")
             
             with tab_list:
                 df_users = db.listar_usuarios()
@@ -437,13 +367,19 @@ with st.sidebar:
                     with st.expander(f"{u['nome']} ({u['perfil']})"):
                         e_nome = st.text_input("Nome", value=u['nome'], key=f"e_n_{u['id']}")
                         e_perf = st.selectbox("Perfil", ["Usuario", "Admin"], index=0 if u['perfil']=='Usuario' else 1, key=f"e_p_{u['id']}")
-                        colA, colB = st.columns(2)
+                        
+                        colA, colB, colC = st.columns([1, 1, 1])
                         with colA:
-                            if st.button("Salvar Edição", key=f"sv_{u['id']}"):
+                            if st.button("💾 Salvar", key=f"sv_{u['id']}", help="Salvar nome/perfil"):
                                 db.atualizar_usuario_info(u['id'], e_nome, e_perf)
                                 st.success("Atualizado!")
                                 st.rerun()
                         with colB:
+                            if st.button("🔑 Resetar", key=f"rs_{u['id']}", help="Reseta a senha para 123"):
+                                db.resetar_senha(u['username'])
+                                db.registrar_log(usuario_logado['nome'], "Reset de Senha", f"Senha de '{u['username']}' resetada.")
+                                st.success("Senha resetada para '123'!")
+                        with colC:
                             if u['username'] != 'bruno.admin': 
                                 if st.button("🗑️ Excluir", key=f"del_{u['id']}"):
                                     db.excluir_usuario(u['username'])
@@ -456,10 +392,10 @@ with st.sidebar:
         st.session_state['logado'] = False
         st.rerun()
 
+
 # --- HEADER SUPERIOR ---
 col_titulo, col_vazia, col_export = st.columns([3, 1, 1])
-with col_titulo:
-    st.title(menu_selecionado.split(" - ")[0])
+with col_titulo: st.title(menu_selecionado.split(" - ")[0])
 
 
 # ==========================================
@@ -467,14 +403,10 @@ with col_titulo:
 # ==========================================
 if menu_selecionado == "Home - Dashboard":
     k1, k2, k3, k4 = st.columns(4)
-    with k1:
-        st.markdown(f'<div class="kpi-main-card"><div class="kpi-main-title">TOTAL DE COLABORADORES</div><div class="kpi-main-value">{total_colaboradores}</div></div>', unsafe_allow_html=True)
-    with k2:
-        st.markdown(f'<div class="kpi-main-card" style="background-color: #F9FAFB;"><div class="kpi-main-title">INATIVOS</div><div class="kpi-main-value" style="color: #9CA3AF;">{total_inativos}</div></div>', unsafe_allow_html=True)
-    with k3:
-        st.markdown(f'<div class="kpi-main-card"><div class="kpi-main-title">HOMENS</div><div class="kpi-main-value" style="color: #1976D2;">{total_homens}</div></div>', unsafe_allow_html=True)
-    with k4:
-        st.markdown(f'<div class="kpi-main-card"><div class="kpi-main-title">MULHERES</div><div class="kpi-main-value" style="color: #C2185B;">{total_mulheres}</div></div>', unsafe_allow_html=True)
+    with k1: st.markdown(f'<div class="kpi-main-card"><div class="kpi-main-title">TOTAL DE COLABORADORES</div><div class="kpi-main-value">{total_colaboradores}</div></div>', unsafe_allow_html=True)
+    with k2: st.markdown(f'<div class="kpi-main-card" style="background-color: #F9FAFB;"><div class="kpi-main-title">INATIVOS</div><div class="kpi-main-value" style="color: #9CA3AF;">{total_inativos}</div></div>', unsafe_allow_html=True)
+    with k3: st.markdown(f'<div class="kpi-main-card border-gender"><div class="kpi-main-title">HOMENS</div><div class="kpi-main-value" style="color: #1976D2;">{total_homens}</div></div>', unsafe_allow_html=True)
+    with k4: st.markdown(f'<div class="kpi-main-card border-gender"><div class="kpi-main-title">MULHERES</div><div class="kpi-main-value" style="color: #C2185B;">{total_mulheres}</div></div>', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
     h1, h2, h3, h4 = st.columns(4)
@@ -508,8 +440,7 @@ if menu_selecionado == "Home - Dashboard":
                             db.atualizar_colaborador(row['id'], row['nome'], row['genero'], row['local'], row['setor'], row['status'], row.get('email', ''), row.get('raca', ''))
                         st.success("Dados atualizados com sucesso!")
                         st.rerun()
-                    except Exception as e: 
-                        st.error(f"Erro ao salvar: {e}")
+                    except Exception as e: st.error(f"Erro ao salvar: {e}")
         else:
             st.dataframe(df_view, use_container_width=True, hide_index=True)
             
@@ -576,7 +507,7 @@ if menu_selecionado == "Home - Dashboard":
             st.markdown(f'<div class="dept-item"><span class="dept-name">Multirão Garantia</span><span class="dept-num" style="color:#7DD3FC;">{count_setor_todos("PF", "Multirão Garantia")}</span></div>', unsafe_allow_html=True)
             st.markdown(f'<div class="dept-item"><span class="dept-name">Jurimetria</span><span class="dept-num" style="color:#7DD3FC;">{count_setor_todos("PF", "Jurimetria")}</span></div>', unsafe_allow_html=True)
 
-    # --- CÁLCULO DINÂMICO DE VAGAS ABERTAS (Lendo as Metas do BD) ---
+    # --- CÁLCULO DINÂMICO DE VAGAS ABERTAS ---
     st.markdown('<hr style="margin:2rem 0;">', unsafe_allow_html=True)
     v1, v2 = st.columns([1, 2])
     with v1: st.markdown('<div class="section-title" style="margin-top:0;">Vagas Abertas</div>', unsafe_allow_html=True)
@@ -589,7 +520,6 @@ if menu_selecionado == "Home - Dashboard":
         loc = row['local']
         setr = row['setor']
         alvo = row['meta']
-        
         ativos_ocupando = count_setor_ativos(loc, setr)
         vagas_restantes = alvo - ativos_ocupando
         
@@ -634,7 +564,6 @@ elif menu_selecionado == "Configurações ⚙️":
     st.write("Abaixo você pode definir a quantidade alvo (Meta de Vagas) para cada setor. O sistema usará este valor para calcular automaticamente quantas vagas estão abertas subtraindo a quantidade de colaboradores ativos no setor.")
     
     df_metas_atual = db.ler_metas()
-    
     st.caption("Dê um duplo clique na coluna 'meta' para alterar o número de vagas. Os outros campos são bloqueados.")
     edited_metas = st.data_editor(df_metas_atual, use_container_width=True, hide_index=True, disabled=["local", "setor"])
     
@@ -645,7 +574,6 @@ elif menu_selecionado == "Configurações ⚙️":
             st.rerun()
         except Exception as e:
             st.error(f"Erro ao salvar metas: {e}")
-            
     st.markdown('</div>', unsafe_allow_html=True)
 
 
@@ -673,10 +601,8 @@ elif menu_selecionado == "Gestão de Pessoas":
                 if db.adicionar_colaborador(dados_novos, usuario_logado['nome']):
                     st.success(f"Cadastro de {nome} realizado com sucesso!")
                     st.rerun()
-                else: 
-                    st.error("Erro: Um colaborador com este nome exato já existe.")
-            else: 
-                st.warning("O Nome é obrigatório.")
+                else: st.error("Erro: Um colaborador com este nome exato já existe.")
+            else: st.warning("O Nome é obrigatório.")
     st.markdown('</div>', unsafe_allow_html=True)
 
 
@@ -691,24 +617,18 @@ elif menu_selecionado == "Integração de Dados (Planilhas)":
     arquivo = st.file_uploader("Selecione a planilha (Excel ou CSV)", type=['xlsx', 'csv'])
     if arquivo:
         try:
-            if arquivo.name.endswith('.csv'): df_import = pd.read_csv(arquivo, delimiter=';') # tenta com ponto e virgula por ser CSV brasileiro as vezes
+            if arquivo.name.endswith('.csv'): df_import = pd.read_csv(arquivo, delimiter=';')
             else: df_import = pd.read_excel(arquivo)
-            
             df_import.columns = df_import.columns.str.lower().str.strip()
-            
-            # Remove caracteres especiais das colunas (ex: espaços)
             df_import.columns = df_import.columns.str.replace(r'[^\w\s]', '', regex=True)
             
             st.success("Planilha lida com sucesso! Visualize a prévia:")
             st.dataframe(df_import.head())
             if st.button("Gravar Dados no Sistema", type="primary", use_container_width=True):
                 qtd = db.importar_massa(df_import, usuario_logado['nome'])
-                if qtd > 0: 
-                    st.success(f"{qtd} registros processados/atualizados com sucesso!")
-                else: 
-                    st.warning("Nenhum dado importado. Verifique o nome exato das colunas na sua planilha original.")
-        except Exception as e: 
-            st.error(f"Erro ao ler arquivo: {e}")
+                if qtd > 0: st.success(f"{qtd} registros processados/atualizados com sucesso!")
+                else: st.warning("Nenhum dado importado. Verifique o nome exato das colunas na sua planilha original.")
+        except Exception as e: st.error(f"Erro ao ler arquivo: {e}")
     st.markdown('</div>', unsafe_allow_html=True)
 
 
@@ -720,7 +640,6 @@ elif menu_selecionado == "Auditoria e Logs 🔐":
     st.subheader("Histórico de Acessos e Alterações")
     df_logs = db.ler_logs()
     busca = st.text_input("🔍 Buscar no log:")
-    if busca: 
-        df_logs = df_logs[df_logs['usuario'].str.contains(busca, case=False, na=False) | df_logs['acao'].str.contains(busca, case=False, na=False)]
+    if busca: df_logs = df_logs[df_logs['usuario'].str.contains(busca, case=False, na=False) | df_logs['acao'].str.contains(busca, case=False, na=False)]
     st.dataframe(df_logs, use_container_width=True, hide_index=True)
     st.markdown('</div>', unsafe_allow_html=True)
